@@ -16,7 +16,7 @@ def read_data():
     mask_files = glob.glob('data/masks-1024x768/*.png')
 
     # convert to images using cv2 and convert to float RGB
-    images = np.array([cv2.cvtColor(cv2.imread(image), cv2.COLOR_BGR2HSV).astype(np.float32) / 255.0
+    images = np.array([cv2.cvtColor(cv2.imread(image), cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
                        for image in image_files])
     masks = np.array([cv2.cvtColor(cv2.imread(mask), cv2.COLOR_BGR2GRAY) > 0
                       for mask in mask_files])
@@ -68,16 +68,21 @@ def main():
 
     train_data_foreground = train_data[train_data_masks[:, 0]]
     train_data_background = train_data[~train_data_masks[:, 0]]
-    data = np.array([-2, 5, 7, 14, 15])
-    gmm = GaussianMixtureModel(
-        6, train_data_foreground.shape[1], max_iter=700, seed=2)
-    # gmm = GaussianMixtureModel(3, 2, max_iter=200)
-    gmm.fit(train_data_foreground[::1000, :])
+
+    # fit the model
+    gmm_foreground = GaussianMixtureModel(
+        6, train_data_foreground.shape[1], max_iter=100, seed=2)
+    gmm_foreground.fit(train_data_foreground)
+
+    gmm_background = GaussianMixtureModel(
+        6, train_data_background.shape[1], max_iter=100, seed=2)
+    gmm_background.fit(train_data_background)
 
     # gm = GaussianMixture(n_components=3, covariance_type='full', max_iter=100)
     # gm.fit(train_data_foreground)
 
-    scatter_plot(train_data_foreground, 1000, gmm)
+    scatter_plot(train_data_foreground, 1000, gmm_foreground)
+    scatter_plot(train_data_background, 1000, gmm_background)
 
 
 if __name__ == "__main__":
