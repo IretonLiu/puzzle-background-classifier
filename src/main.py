@@ -270,7 +270,7 @@ def run_unet():
 
     unet = UNet()
     in_image = np.rollaxis(train_images[0], 2)
-    out = unet(torch.from_numpy(in_image))
+    out = unet(torch.from_numpy(in_image.astype(np.float32) / 255.0))
 
 
 if __name__ == "__main__":

@@ -27,15 +27,15 @@ class Down(nn.Module):
     """
     this is one of a repeated "unit" which performs a double convolution, and then downsamples (for the contracting path).
 
-    convolution will double the number of channels, and is done with a 3x3 filter
     max-pooling is done with 2x2 filter and stride 2 to reduce the dimensions of the feature map
+    convolution will double the number of channels, and is done with a 3x3 filter
     """
 
     def __init__(self, in_channels, out_channels):
-        # assert in_channels * 2 == out_channels
+        assert in_channels * 2 == out_channels
         super().__init__()
         self.max_pool = nn.Sequential(
-            DoubleConvolution(in_channels, out_channels), nn.MaxPool2d(2, 2)
+            nn.MaxPool2d(2, 2), DoubleConvolution(in_channels, out_channels)
         )
 
     def forward(self, x):
@@ -53,7 +53,7 @@ class Up(nn.Module):
     """
 
     def __init__(self, in_channels, out_channels):
-        # assert in_channels // 2 == out_channels
+        assert in_channels // 2 == out_channels
         super().__init__()
 
         # deconvolution with 2x2 filter and stride of 2 (is the green arrow)
@@ -62,7 +62,7 @@ class Up(nn.Module):
         )
 
         # perform the double convolution
-        self.double_convolution = DoubleConvolution(in_channels, out_channels)
+        self.double_convolution = DoubleConvolution(out_channels, out_channels)
 
     def forward(self, x, feature_map):
         # apply the upsampling, which will halve the number of channels so it matches the feature_map
@@ -71,8 +71,8 @@ class Up(nn.Module):
         # crop the feature map so it has the same spatial dimensions as the current data
         # this is necessary because the convolutions are not padded, so the size decreases
         # get the size difference
-        vert_dim = 2
-        hori_dim = 3
+        vert_dim = 1
+        hori_dim = 2
         dim0_size_diff = feature_map.size()[vert_dim] - x.size()[vert_dim]
         dim1_size_diff = feature_map.size()[hori_dim] - x.size()[hori_dim]
 
@@ -103,14 +103,15 @@ class UNet(nn.Module):
     def __init__(self):
         super().__init__()
 
-        # Contracting path
-        self.down1 = Down(3, 64)
-        self.down2 = Down(64, 128)
-        self.down3 = Down(128, 256)
-        self.down4 = Down(256, 512)
+        # Initial Transforms
+        # is just a double convolution, no downsampling
+        self.initial = DoubleConvolution(3, 64)
 
-        # Middle -> is the same as the Down layers, but without the final downsampling
-        self.middle = DoubleConvolution(512, 1024)
+        # Contracting path
+        self.down1 = Down(64, 128)
+        self.down2 = Down(128, 256)
+        self.down3 = Down(256, 512)
+        self.down4 = Down(512, 1024)
 
         # Expansive path
         # the number in the name of the layer matches to the down units for the concat of the feature map
@@ -126,14 +127,15 @@ class UNet(nn.Module):
     def forward(self, x):
         # pass the image through the unet
 
-        # Contracting path
-        down1 = self.down1(x)
-        down2 = self.down2(down1)
-        down3 = self.down3(down2)
-        down4 = self.down4(down3)
+        # initial
+        down1 = self.initial(x)
 
-        # middle
-        middle = self.middle(down4)
+        # Contracting path
+        # names are the end of that unit
+        down2 = self.down1(down1)
+        down3 = self.down2(down2)
+        down4 = self.down3(down3)
+        middle = self.down4(down4)
 
         # Expansive path
         # the number in the name of the layer matches to the down units for the concat of the feature map
