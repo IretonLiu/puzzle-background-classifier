@@ -1,4 +1,5 @@
 from ftplib import error_reply
+import os
 import numpy as np
 from scipy.stats import multivariate_normal, norm
 
@@ -13,7 +14,7 @@ class GaussianMixtureModel():
 
     """
 
-    def __init__(self, n_components, dim, epsilon=0.0001, max_iter=100, seed=0) -> None:
+    def __init__(self, n_components, dim, epsilon=0.000001, max_iter=100, seed=0) -> None:
         """
         Parameters:
         h: the hidden variable
@@ -95,3 +96,25 @@ class GaussianMixtureModel():
         r /= np.sum(r, axis=0)
 
         return r
+
+    def save_model(self, dir):
+        try:
+            if not os.path.exists(dir):
+                os.makedirs(dir)
+            np.save(dir+"lambda.npy", self.l)
+            np.save(dir+"means.npy", self.means_)
+            np.save(dir+"covariances.npy", self.covariances_)
+            print("Model saved to: ", dir)
+        except FileNotFoundError:
+            print("Error saving model")
+
+    def load_model(self, dir):
+        try:
+            self.l = np.load(dir+"lambda.npy")
+            self.means_ = np.load(dir+"means.npy")
+            self.covariances_ = np.load(dir+"covariances.npy")
+        except FileNotFoundError:
+            print("No such file or directory")
+
+    def pdf(self, data):
+        return np.sum([self.l[i]*multivariate_normal(mean=self.means_[i], cov=self.covariances_[i]).pdf(data) for i in range(self.n_components)], axis=0)
