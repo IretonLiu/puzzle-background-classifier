@@ -13,6 +13,7 @@ from sklearn.mixture import GaussianMixture
 from classifier import Classifier
 from unet import UNet
 import torch
+from torchvision import transforms as T
 
 res = (1024, 768)
 
@@ -24,10 +25,12 @@ def read_data():
 
     # convert to images using cv2 and convert to float RGB
     images = np.array(
-        [cv2.cvtColor(cv2.imread(image), cv2.COLOR_BGR2RGB) for image in image_files]
+        [cv2.cvtColor(cv2.imread(image), cv2.COLOR_BGR2RGB)
+         for image in image_files]
     )
     masks = np.array(
-        [cv2.cvtColor(cv2.imread(mask), cv2.COLOR_BGR2GRAY) > 0 for mask in mask_files]
+        [cv2.cvtColor(cv2.imread(mask), cv2.COLOR_BGR2GRAY)
+         > 0 for mask in mask_files]
     )
 
     return images, masks
@@ -36,12 +39,12 @@ def read_data():
 def split_dataset(images, masks):
     # split the images and masks into training validation and test with ration 70:15:15
     training_images = images[: int(len(images) * 0.7)]
-    validation_images = images[int(len(images) * 0.7) : int(len(images) * 0.85)]
-    testing_images = images[int(len(images) * 0.85) :]
+    validation_images = images[int(len(images) * 0.7): int(len(images) * 0.85)]
+    testing_images = images[int(len(images) * 0.85):]
 
     training_masks = masks[: int(len(masks) * 0.7)]
-    validation_masks = masks[int(len(masks) * 0.7) : int(len(masks) * 0.85)]
-    testing_masks = masks[int(len(masks) * 0.85) :]
+    validation_masks = masks[int(len(masks) * 0.7): int(len(masks) * 0.85)]
+    testing_masks = masks[int(len(masks) * 0.85):]
 
     return (
         training_images,
@@ -51,6 +54,43 @@ def split_dataset(images, masks):
         validation_masks,
         testing_masks,
     )
+
+
+def random_affine(degrees, translate):
+    # get the affine transformation matrix
+
+    degree = np.random.uniform(degrees[0], degrees[1])
+
+
+def augment_images(images, masks, n=10):
+
+    # convert to tensors and rearrange to channels first
+    image_tensors = torch.from_numpy(images).permute(0, 3, 1, 2)
+    mask_tensors = torch.from_numpy(masks).unsqueeze(1)
+
+    augmented_images = []
+    augmented_masks = []
+    for image_tensor, mask_tensor in zip(image_tensors, mask_tensors):
+
+        for i in range(n):
+            # get the affine transformation parameters
+            params = T.RandomAffine.get_params(
+                degrees=(-180, 180), translate=(0.3, 0.3), scale_ranges=None, shears=None, img_size=image_tensor.size(),)
+
+            # apply the affine transformation
+            aug_image = T.functional.affine(image_tensor, *params)
+            aug_mask = T.functional.affine(mask_tensor, *params)
+
+            augmented_images.append(aug_image)
+            augmented_masks.append(aug_mask)
+
+    # add the original images
+    augmented_images = torch.cat(
+        (image_tensors, torch.stack(augmented_images)), dim=0)
+    augmented_masks = torch.cat(
+        (mask_tensors, torch.stack(augmented_masks)), dim=0)
+
+    return augmented_images, augmented_masks
 
 
 def scatter_plot(data, step, gmm=None):
@@ -89,11 +129,13 @@ def to_feature_vector(images, feature_type):
     elif feature_type == "rgb+dog":
         dog = np.array(
             [
-                cv2.GaussianBlur(image, (3, 3), 0) - cv2.GaussianBlur(image, (5, 5), 0)
+                cv2.GaussianBlur(image, (3, 3), 0) -
+                cv2.GaussianBlur(image, (5, 5), 0)
                 for image in float_images
             ]
         )
-        dog = np.array([(d - np.min(d)) / (np.max(d) - np.min(d)) for d in dog])
+        dog = np.array([(d - np.min(d)) / (np.max(d) - np.min(d))
+                       for d in dog])
         print(dog)
         return np.hstack((float_images.reshape(-1, 3), dog.reshape(-1, 3)))
     elif feature_type == "hsv+xy":
@@ -103,7 +145,8 @@ def to_feature_vector(images, feature_type):
         ).reshape(-1, 3)
         # a np array of the x and y coordinates
         xy = np.array(
-            [np.indices(image_dim[:2]).transpose((1, 2, 0)) for image in images]
+            [np.indices(image_dim[:2]).transpose((1, 2, 0))
+             for image in images]
         ).reshape(-1, 2)
         # normalize the hsv values
         return np.hstack(
@@ -160,7 +203,8 @@ def run_gmm():
                     gmm_background.fit(train_data_background)
                 except:
                     print(
-                        "Failed to fit background GMM with h = {}".format(background_h)
+                        "Failed to fit background GMM with h = {}".format(
+                            background_h)
                     )
                     continue
                 print("Training time:", (time.time() - start_time))
@@ -202,10 +246,12 @@ def run_gmm():
             train_data_masks = train_masks.reshape(-1, 1)
             train_data_foreground = train_data[train_data_masks[:, 0]]
 
-            plt.imshow(train_data_foreground[:6615184, :].reshape(2572, 2572, 3))
+            plt.imshow(
+                train_data_foreground[:6615184, :].reshape(2572, 2572, 3))
             plt.show()
             train_data_background = train_data[~train_data_masks[:, 0]]
-            plt.imshow(train_data_background[:19333609, :].reshape(4397, 4397, 3))
+            plt.imshow(
+                train_data_background[:19333609, :].reshape(4397, 4397, 3))
             plt.show()
             classifier = Classifier(train_data, train_data_masks)
 
@@ -237,7 +283,7 @@ def run_gmm():
                     # test the model
 
                     # likelihoods = [gmm_background, gmm_foreground]
-                    # probabilities = classifier.maximum_a_posteriori(
+                    # protrain_imagesbabilities = classifier.maximum_a_posteriori(
                     #     likelihoods)
                     # predictions = np.argmax(probabilities, axis=0) == 1
 
@@ -268,13 +314,15 @@ def run_unet():
         test_masks,
     ) = split_dataset(images, masks)
 
-    unet = UNet()
-    unet.load_vgg_weights()
+    augmented_images, augmented_masks = augment_images(
+        train_images, train_masks)
 
-    in_image = np.rollaxis(train_images[0], 2)
-    out = unet(torch.from_numpy(in_image.astype(np.float32) / 255.0))
+    print(augment_images.size())
+    # unet = UNet()
+    # unet.load_vgg_weights()
 
-    print("here")
+    # in_image = np.rollaxis(train_images[0], 2)
+    # out = unet(torch.from_numpy(in_image.astype(np.float32) / 255.0))
 
 
 if __name__ == "__main__":
