@@ -269,8 +269,12 @@ def run_unet():
     ) = split_dataset(images, masks)
 
     unet = UNet()
+    unet.load_vgg_weights()
+
     in_image = np.rollaxis(train_images[0], 2)
     out = unet(torch.from_numpy(in_image.astype(np.float32) / 255.0))
+
+    print("here")
 
 
 if __name__ == "__main__":
