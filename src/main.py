@@ -27,12 +27,10 @@ def read_data():
 
     # convert to images using cv2 and convert to float RGB
     images = np.array(
-        [cv2.cvtColor(cv2.imread(image), cv2.COLOR_BGR2RGB)
-         for image in image_files]
+        [cv2.cvtColor(cv2.imread(image), cv2.COLOR_BGR2RGB) for image in image_files]
     )
     masks = np.array(
-        [cv2.cvtColor(cv2.imread(mask), cv2.COLOR_BGR2GRAY)
-         > 0 for mask in mask_files]
+        [cv2.cvtColor(cv2.imread(mask), cv2.COLOR_BGR2GRAY) > 0 for mask in mask_files]
     )
 
     return images, masks
@@ -47,7 +45,10 @@ def split_dataset(images, masks):
     zipped_images = list(zip(images, masks))
     # Split images into train, test and validation
     train_set, val_set, test_set = random_split(
-        zipped_images, [training_count, validation_count, testing_count], generator=torch.Generator().manual_seed(0))
+        zipped_images,
+        [training_count, validation_count, testing_count],
+        generator=torch.Generator().manual_seed(0),
+    )
 
     # train_images, train_masks = zip(*train_set)
     # val_images, val_masks = zip(*val_set)
@@ -83,7 +84,12 @@ def augment_images(images, masks, n=10):
         for i in range(n):
             # get the affine transformation parameters
             params = T.RandomAffine.get_params(
-                degrees=(-180, 180), translate=(0.3, 0.3), scale_ranges=None, shears=None, img_size=image_tensor.size(),)
+                degrees=(-180, 180),
+                translate=(0.3, 0.3),
+                scale_ranges=None,
+                shears=None,
+                img_size=image_tensor.size(),
+            )
 
             # apply the affine transformation
             aug_image = T.functional.affine(image_tensor, *params)
@@ -93,10 +99,8 @@ def augment_images(images, masks, n=10):
             augmented_masks.append(aug_mask)
 
     # add the original images
-    augmented_images = torch.cat(
-        (image_tensors, torch.stack(augmented_images)), dim=0)
-    augmented_masks = torch.cat(
-        (mask_tensors, torch.stack(augmented_masks)), dim=0)
+    augmented_images = torch.cat((image_tensors, torch.stack(augmented_images)), dim=0)
+    augmented_masks = torch.cat((mask_tensors, torch.stack(augmented_masks)), dim=0)
 
     return augmented_images, augmented_masks
 
@@ -137,13 +141,11 @@ def to_feature_vector(images, feature_type):
     elif feature_type == "rgb+dog":
         dog = np.array(
             [
-                cv2.GaussianBlur(image, (3, 3), 0) -
-                cv2.GaussianBlur(image, (5, 5), 0)
+                cv2.GaussianBlur(image, (3, 3), 0) - cv2.GaussianBlur(image, (5, 5), 0)
                 for image in float_images
             ]
         )
-        dog = np.array([(d - np.min(d)) / (np.max(d) - np.min(d))
-                       for d in dog])
+        dog = np.array([(d - np.min(d)) / (np.max(d) - np.min(d)) for d in dog])
         print(dog)
         return np.hstack((float_images.reshape(-1, 3), dog.reshape(-1, 3)))
     elif feature_type == "hsv+xy":
@@ -153,8 +155,7 @@ def to_feature_vector(images, feature_type):
         ).reshape(-1, 3)
         # a np array of the x and y coordinates
         xy = np.array(
-            [np.indices(image_dim[:2]).transpose((1, 2, 0))
-             for image in images]
+            [np.indices(image_dim[:2]).transpose((1, 2, 0)) for image in images]
         ).reshape(-1, 2)
         # normalize the hsv values
         return np.hstack(
@@ -211,8 +212,7 @@ def run_gmm():
                     gmm_background.fit(train_data_background)
                 except:
                     print(
-                        "Failed to fit background GMM with h = {}".format(
-                            background_h)
+                        "Failed to fit background GMM with h = {}".format(background_h)
                     )
                     continue
                 print("Training time:", (time.time() - start_time))
@@ -254,12 +254,10 @@ def run_gmm():
             train_data_masks = train_masks.reshape(-1, 1)
             train_data_foreground = train_data[train_data_masks[:, 0]]
 
-            plt.imshow(
-                train_data_foreground[:6615184, :].reshape(2572, 2572, 3))
+            plt.imshow(train_data_foreground[:6615184, :].reshape(2572, 2572, 3))
             plt.show()
             train_data_background = train_data[~train_data_masks[:, 0]]
-            plt.imshow(
-                train_data_background[:19333609, :].reshape(4397, 4397, 3))
+            plt.imshow(train_data_background[:19333609, :].reshape(4397, 4397, 3))
             plt.show()
             classifier = Classifier(train_data, train_data_masks)
 
@@ -313,8 +311,7 @@ def run_gmm():
 
 def run_unet():
     images, masks = read_data()
-    augmented_images, augmented_masks = augment_images(
-        images, masks)
+    augmented_images, augmented_masks = augment_images(images, masks)
     # (
     #     train_images,
     #     train_masks,
@@ -324,15 +321,13 @@ def run_unet():
     #     test_masks,
     # ) = split_dataset(images, masks)
 
-    train_set, val_set, test_set = split_dataset(
-        augmented_images, augmented_masks)
+    train_set, val_set, test_set = split_dataset(augmented_images, augmented_masks)
 
-    batch_size = 1
+    batch_size = 2
 
     loader_args = dict(batch_size=batch_size, num_workers=4, pin_memory=True)
     train_loader = DataLoader(train_set, shuffle=True, **loader_args)
-    val_loader = DataLoader(val_set, shuffle=False,
-                            drop_last=True, **loader_args)
+    val_loader = DataLoader(val_set, shuffle=False, drop_last=True, **loader_args)
     unet = UNet(n_channels=3)
     unet.load_vgg_weights()
     unet.train(train_loader, epoch=10)

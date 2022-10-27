@@ -78,7 +78,7 @@ class Up(nn.Module):
         )
 
         # perform the double convolution
-        self.double_convolution = DoubleConvolution(out_channels, out_channels)
+        self.double_convolution = DoubleConvolution(in_channels, out_channels)
 
     def forward(self, x, feature_map):
         # apply the upsampling, which will halve the number of channels so it matches the feature_map
@@ -142,7 +142,7 @@ class UNet(nn.Module):
         self.final = nn.Conv2d(64, 1, kernel_size=1)
 
         #  Set up the optimizer, the loss, the learning rate scheduler and the loss scaling for AMP
-        self.optmiser = torch.optim.Adam(self.parameters(), lr=learning_rate)
+        self.optimiser = torch.optim.Adam(self.parameters(), lr=learning_rate)
 
     def train(self, train_data_loader, epoch=10):
         self.to(device=device)
@@ -150,30 +150,53 @@ class UNet(nn.Module):
             print("Starting epoch {}".format(i))
             epoch_loss = 0
             # https://github.com/milesial/Pytorch-UNet/blob/master/train.py
-            with tqdm(total=len(train_data_loader), desc=f'Epoch {i}/{epoch}', unit='img') as pbar:
+            with tqdm(
+                total=len(train_data_loader), desc=f"Epoch {i}/{epoch}", unit="img"
+            ) as pbar:
                 for batch in train_data_loader:
                     images = batch[0]
                     true_masks = batch[1]
 
-                    assert images.shape[1] == self.n_channels, \
-                        f'Network has been defined with {self.n_channels} input channels, ' \
-                        f'but loaded images have {images.shape[1]} channels. Please check that ' \
-                        'the images are loaded correctly.'
+                    assert images.shape[1] == self.n_channels, (
+                        f"Network has been defined with {self.n_channels} input channels, "
+                        f"but loaded images have {images.shape[1]} channels. Please check that "
+                        "the images are loaded correctly."
+                    )
 
                     images = images.to(device=device, dtype=torch.float32)
-                    true_masks = true_masks.to(device=device, dtype=torch.long)
+                    true_masks = true_masks.to(device=device, dtype=torch.float32)
 
                     pred_masks = self(images)
-                    loss = F.cross_entropy(pred_masks, true_masks)
+
+                    vert_dim = 2
+                    hori_dim = 3
+                    dim0_size_diff = (
+                        true_masks.size()[vert_dim] - pred_masks.size()[vert_dim]
+                    )
+                    dim1_size_diff = (
+                        true_masks.size()[hori_dim] - pred_masks.size()[hori_dim]
+                    )
+
+                    # crop the true masks
+                    if dim0_size_diff != 0 and dim1_size_diff != 0:
+                        true_masks = crop(
+                            true_masks,
+                            dim0_size_diff // 2,  # top left vertical component
+                            dim1_size_diff // 2,  # top left horizontal component
+                            pred_masks.size()[vert_dim],  # height of the cropped area
+                            pred_masks.size()[hori_dim],  # width of the cropped area
+                        )
+
+                    loss = F.cross_entropy(pred_masks.squeeze(), true_masks.squeeze())
 
                     self.optimiser.zero_grad()
-                    self.loss.backward()
-                    self.optmiser.step()
+                    loss.backward()
+                    self.optimiser.step()
 
                     pbar.update(images.shape[0])
-                    global_step += 1
+                    # global_step += 1
                     epoch_loss += loss.item()
-                    pbar.set_postfix(**{'loss (batch)': loss.item()})
+                    pbar.set_postfix(**{"loss (batch)": loss.item()})
 
     def forward(self, x):
         # pass the image through the unet
@@ -195,8 +218,11 @@ class UNet(nn.Module):
         x = self.up2(x, down2)
         x = self.up1(x, down1)
 
-        # final layer to get the desired number of classes
-        return self.Sigmoid(self.final(x))
+        # final layer to get the desired number of classes -> 2 classes represented by a single value
+        x = self.final(x)
+
+        # sigmoid activation to map to (0, 1) -> use 0.5 as a threshold
+        return torch.sigmoid(x)
 
     def load_vgg_weights(self):
         # load the pretrained weights for the relevant layers
