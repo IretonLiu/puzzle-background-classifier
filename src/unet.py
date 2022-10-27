@@ -3,6 +3,9 @@ import torch.nn.functional as F
 from torchvision.transforms.functional import crop
 from torchvision.models import vgg16, VGG16_Weights
 import torch
+from tqdm import tqdm
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class DoubleConvolution(nn.Module):
@@ -84,8 +87,8 @@ class Up(nn.Module):
         # crop the feature map so it has the same spatial dimensions as the current data
         # this is necessary because the convolutions are not padded, so the size decreases
         # get the size difference
-        vert_dim = 1
-        hori_dim = 2
+        vert_dim = 2
+        hori_dim = 3
         dim0_size_diff = feature_map.size()[vert_dim] - x.size()[vert_dim]
         dim1_size_diff = feature_map.size()[hori_dim] - x.size()[hori_dim]
 
@@ -113,9 +116,10 @@ class UNet(nn.Module):
     the on presented in the paper "U-Net: Convolutional Networks for Biomedical Image Segmentation".
     """
 
-    def __init__(self):
+    def __init__(self, n_channels, learning_rate=0.001):
         super().__init__()
 
+        self.n_channels = n_channels
         # Initial Transforms
         # is just a double convolution, no downsampling
         self.initial = DoubleConvolution(3, 64)
@@ -135,7 +139,41 @@ class UNet(nn.Module):
 
         # final layer to reduce to a single dimension, which will be the classification
         # map to 2 channels since there are 2 classes
-        self.final = nn.Conv2d(64, 2, kernel_size=1)
+        self.final = nn.Conv2d(64, 1, kernel_size=1)
+
+        #  Set up the optimizer, the loss, the learning rate scheduler and the loss scaling for AMP
+        self.optmiser = torch.optim.Adam(self.parameters(), lr=learning_rate)
+
+    def train(self, train_data_loader, epoch=10):
+        self.to(device=device)
+        for i in range(epoch):
+            print("Starting epoch {}".format(i))
+            epoch_loss = 0
+            # https://github.com/milesial/Pytorch-UNet/blob/master/train.py
+            with tqdm(total=len(train_data_loader), desc=f'Epoch {i}/{epoch}', unit='img') as pbar:
+                for batch in train_data_loader:
+                    images = batch[0]
+                    true_masks = batch[1]
+
+                    assert images.shape[1] == self.n_channels, \
+                        f'Network has been defined with {self.n_channels} input channels, ' \
+                        f'but loaded images have {images.shape[1]} channels. Please check that ' \
+                        'the images are loaded correctly.'
+
+                    images = images.to(device=device, dtype=torch.float32)
+                    true_masks = true_masks.to(device=device, dtype=torch.long)
+
+                    pred_masks = self(images)
+                    loss = F.cross_entropy(pred_masks, true_masks)
+
+                    self.optimiser.zero_grad()
+                    self.loss.backward()
+                    self.optmiser.step()
+
+                    pbar.update(images.shape[0])
+                    global_step += 1
+                    epoch_loss += loss.item()
+                    pbar.set_postfix(**{'loss (batch)': loss.item()})
 
     def forward(self, x):
         # pass the image through the unet
@@ -158,11 +196,10 @@ class UNet(nn.Module):
         x = self.up1(x, down1)
 
         # final layer to get the desired number of classes
-        return self.final(x)
+        return self.Sigmoid(self.final(x))
 
     def load_vgg_weights(self):
         # load the pretrained weights for the relevant layers
-
         """
         all convs are 3x3 filters, except the last conv
         our layers are:

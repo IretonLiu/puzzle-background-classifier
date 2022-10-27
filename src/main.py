@@ -12,7 +12,9 @@ from ellipsoid import get_cov_ellipsoid
 from sklearn.mixture import GaussianMixture
 from classifier import Classifier
 from unet import UNet
+
 import torch
+from torch.utils.data import DataLoader, random_split
 from torchvision import transforms as T
 
 res = (1024, 768)
@@ -38,22 +40,28 @@ def read_data():
 
 def split_dataset(images, masks):
     # split the images and masks into training validation and test with ration 70:15:15
-    training_images = images[: int(len(images) * 0.7)]
-    validation_images = images[int(len(images) * 0.7): int(len(images) * 0.85)]
-    testing_images = images[int(len(images) * 0.85):]
+    training_count = int(round(len(images) * 0.7))
+    validation_count = int(round(len(images) * 0.15))
+    testing_count = int(round(len(images) * 0.15))
 
-    training_masks = masks[: int(len(masks) * 0.7)]
-    validation_masks = masks[int(len(masks) * 0.7): int(len(masks) * 0.85)]
-    testing_masks = masks[int(len(masks) * 0.85):]
+    zipped_images = list(zip(images, masks))
+    # Split images into train, test and validation
+    train_set, val_set, test_set = random_split(
+        zipped_images, [training_count, validation_count, testing_count], generator=torch.Generator().manual_seed(0))
 
-    return (
-        training_images,
-        validation_images,
-        testing_images,
-        training_masks,
-        validation_masks,
-        testing_masks,
-    )
+    # train_images, train_masks = zip(*train_set)
+    # val_images, val_masks = zip(*val_set)
+    # test_images, test_masks = zip(*test_set)
+
+    # return (
+    #     np.array(train_images),
+    #     np.array(train_masks),
+    #     np.array(val_images),
+    #     np.array(val_masks),
+    #     np.array(test_images),
+    #     np.array(test_masks),
+    # )
+    return train_set, val_set, test_set
 
 
 def random_affine(degrees, translate):
@@ -305,21 +313,29 @@ def run_gmm():
 
 def run_unet():
     images, masks = read_data()
-    (
-        train_images,
-        val_images,
-        test_images,
-        train_masks,
-        val_masks,
-        test_masks,
-    ) = split_dataset(images, masks)
-
     augmented_images, augmented_masks = augment_images(
-        train_images, train_masks)
+        images, masks)
+    # (
+    #     train_images,
+    #     train_masks,
+    #     val_images,
+    #     val_masks,
+    #     test_images,
+    #     test_masks,
+    # ) = split_dataset(images, masks)
 
-    print(augment_images.size())
-    # unet = UNet()
-    # unet.load_vgg_weights()
+    train_set, val_set, test_set = split_dataset(
+        augmented_images, augmented_masks)
+
+    batch_size = 1
+
+    loader_args = dict(batch_size=batch_size, num_workers=4, pin_memory=True)
+    train_loader = DataLoader(train_set, shuffle=True, **loader_args)
+    val_loader = DataLoader(val_set, shuffle=False,
+                            drop_last=True, **loader_args)
+    unet = UNet(n_channels=3)
+    unet.load_vgg_weights()
+    unet.train(train_loader, epoch=10)
 
     # in_image = np.rollaxis(train_images[0], 2)
     # out = unet(torch.from_numpy(in_image.astype(np.float32) / 255.0))
