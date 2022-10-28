@@ -144,14 +144,74 @@ class UNet(nn.Module):
         #  Set up the optimizer, the loss, the learning rate scheduler and the loss scaling for AMP
         self.optimiser = torch.optim.Adam(self.parameters(), lr=learning_rate)
 
-    def train(self, train_data_loader, epoch=10):
+    def evaluate(self, val_data_loader):
         self.to(device=device)
-        for i in range(epoch):
+        super().eval()
+
+        #
+        val_loss = 0
+        with tqdm(total=len(val_data_loader), desc=f"Validating", unit="img") as pbar:
+            # evaluation - no need to track gradients
+            with torch.no_grad():
+                for batch in val_data_loader:
+                    images = batch[0]
+                    true_masks = batch[1]
+
+                    assert images.shape[1] == self.n_channels, (
+                        f"Network has been defined with {self.n_channels} input channels, "
+                        f"but loaded images have {images.shape[1]} channels. Please check that "
+                        "the images are loaded correctly."
+                    )
+
+                    images = images.to(device=device, dtype=torch.float32)
+                    true_masks = true_masks.to(device=device, dtype=torch.float32)
+
+                    pred_masks = self(images)
+
+                    vert_dim = 2
+                    hori_dim = 3
+                    dim0_size_diff = (
+                        true_masks.size()[vert_dim] - pred_masks.size()[vert_dim]
+                    )
+                    dim1_size_diff = (
+                        true_masks.size()[hori_dim] - pred_masks.size()[hori_dim]
+                    )
+
+                    # crop the true masks
+                    if dim0_size_diff != 0 and dim1_size_diff != 0:
+                        true_masks = crop(
+                            true_masks,
+                            dim0_size_diff // 2,  # top left vertical component
+                            dim1_size_diff // 2,  # top left horizontal component
+                            pred_masks.size()[vert_dim],  # height of the cropped area
+                            pred_masks.size()[hori_dim],  # width of the cropped area
+                        )
+
+                    loss = F.mse_loss(pred_masks, true_masks)
+
+                    pbar.update(images.shape[0])
+                    val_loss += loss.item()
+                    pbar.set_postfix(**{"loss (batch)": loss.item()})
+
+        super().train()
+        return val_loss
+
+    def train(
+        self,
+        train_data_loader,
+        val_data_loader,
+        save_path,
+        max_epoch=10,
+        current_epoch=0,
+    ):
+        self.to(device=device)
+        super().train()
+        for i in range(current_epoch, max_epoch):
             print("Starting epoch {}".format(i))
             epoch_loss = 0
             # https://github.com/milesial/Pytorch-UNet/blob/master/train.py
             with tqdm(
-                total=len(train_data_loader), desc=f"Epoch {i}/{epoch}", unit="img"
+                total=len(train_data_loader), desc=f"Epoch {i}/{max_epoch}", unit="img"
             ) as pbar:
                 for batch in train_data_loader:
                     images = batch[0]
@@ -187,16 +247,23 @@ class UNet(nn.Module):
                             pred_masks.size()[hori_dim],  # width of the cropped area
                         )
 
-                    loss = F.cross_entropy(pred_masks.squeeze(), true_masks.squeeze())
+                    loss = F.mse_loss(pred_masks, true_masks)
 
                     self.optimiser.zero_grad()
                     loss.backward()
                     self.optimiser.step()
 
                     pbar.update(images.shape[0])
-                    # global_step += 1
                     epoch_loss += loss.item()
                     pbar.set_postfix(**{"loss (batch)": loss.item()})
+
+            # save model and to evaluation on validation data
+            path = f"{save_path}/epoch_{i}.pt"
+            self.save_model(path, i)
+            val_loss = self.evaluate(val_data_loader)
+            print(f"Epoch {i}:")
+            print(f"\ttraining loss = {epoch_loss}")
+            print(f"\tvalidation loss = {val_loss}")
 
     def forward(self, x):
         # pass the image through the unet
@@ -265,6 +332,36 @@ class UNet(nn.Module):
         self.down3.load_conv_weights(vgg, 17, 19)
 
         print("Finished loading")
+
+    def save_model(self, path, epoch):
+        """
+        save the model to the specified dir
+        """
+
+        print("saving model to", path)
+        torch.save(
+            {
+                "epoch": epoch,
+                "model_state_dict": self.state_dict(),
+                "optimiser_state_dict": self.optimiser.state_dict(),
+            },
+            path,
+        )
+
+        print("model save to", path)
+
+    def load_model(self, path):
+        """
+        load the policy network from the specified dir
+        """
+
+        print("loading model from", path)
+        saved = torch.load(path)
+        self.load_state_dict(saved["model_state_dict"])
+        self.optimiser.load_state_dict(saved["optimiser_state_dict"])
+        print("model loaded from", path)
+
+        return saved["epoch"]
 
 
 """

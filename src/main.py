@@ -1,6 +1,9 @@
 import glob
 import cv2
 import time
+import os
+from natsort import natsorted
+
 # from matplotlib.pyplot import scatter
 # import matplotlib.pyplot as plt
 import numpy as np
@@ -11,7 +14,7 @@ from scipy.stats import multivariate_normal
 from ellipsoid import get_cov_ellipsoid
 from sklearn.mixture import GaussianMixture
 from classifier import Classifier
-# from unet import UNet
+from unet import UNet
 
 import torch
 from torch.utils.data import DataLoader, random_split
@@ -27,12 +30,10 @@ def read_data():
 
     # convert to images using cv2 and convert to float RGB
     images = np.array(
-        [cv2.cvtColor(cv2.imread(image), cv2.COLOR_BGR2RGB)
-         for image in image_files]
+        [cv2.cvtColor(cv2.imread(image), cv2.COLOR_BGR2RGB) for image in image_files]
     )
     masks = np.array(
-        [cv2.cvtColor(cv2.imread(mask), cv2.COLOR_BGR2GRAY)
-         > 0 for mask in mask_files]
+        [cv2.cvtColor(cv2.imread(mask), cv2.COLOR_BGR2GRAY) > 0 for mask in mask_files]
     )
 
     return images, masks
@@ -40,9 +41,10 @@ def read_data():
 
 def split_dataset(images, masks):
     # split the images and masks into training validation and test with ration 70:15:15
-    training_count = int(round(len(images) * 0.7))
-    validation_count = int(round(len(images) * 0.15))
-    testing_count = int(round(len(images) * 0.15))
+    # todo change back
+    training_count = int(round(len(images) * 0.6))
+    validation_count = int(round(len(images) * 0.2))
+    testing_count = int(round(len(images) * 0.2))
 
     zipped_images = list(zip(images, masks))
     # Split images into train, test and validation
@@ -79,6 +81,9 @@ def augment_images(images, masks, n=10):
     image_tensors = torch.from_numpy(images).permute(0, 3, 1, 2)
     mask_tensors = torch.from_numpy(masks).unsqueeze(1)
 
+    if n <= 0:
+        return image_tensors, mask_tensors
+
     augmented_images = []
     augmented_masks = []
     for image_tensor, mask_tensor in zip(image_tensors, mask_tensors):
@@ -101,10 +106,8 @@ def augment_images(images, masks, n=10):
             augmented_masks.append(aug_mask)
 
     # add the original images
-    augmented_images = torch.cat(
-        (image_tensors, torch.stack(augmented_images)), dim=0)
-    augmented_masks = torch.cat(
-        (mask_tensors, torch.stack(augmented_masks)), dim=0)
+    augmented_images = torch.cat((image_tensors, torch.stack(augmented_images)), dim=0)
+    augmented_masks = torch.cat((mask_tensors, torch.stack(augmented_masks)), dim=0)
 
     return augmented_images, augmented_masks
 
@@ -145,13 +148,11 @@ def to_feature_vector(images, feature_type):
     elif feature_type == "rgb+dog":
         dog = np.array(
             [
-                cv2.GaussianBlur(image, (3, 3), 0) -
-                cv2.GaussianBlur(image, (5, 5), 0)
+                cv2.GaussianBlur(image, (3, 3), 0) - cv2.GaussianBlur(image, (5, 5), 0)
                 for image in float_images
             ]
         )
-        dog = np.array([(d - np.min(d)) / (np.max(d) - np.min(d))
-                       for d in dog])
+        dog = np.array([(d - np.min(d)) / (np.max(d) - np.min(d)) for d in dog])
         return np.hstack((float_images.reshape(-1, 3), dog.reshape(-1, 3)))
     elif feature_type == "hsv+xy":
         # convert float images to hsv
@@ -160,8 +161,7 @@ def to_feature_vector(images, feature_type):
         ).reshape(-1, 3)
         # a np array of the x and y coordinates
         xy = np.array(
-            [np.indices(image_dim[:2]).transpose((1, 2, 0))
-             for image in images]
+            [np.indices(image_dim[:2]).transpose((1, 2, 0)) for image in images]
         ).reshape(-1, 2)
         # normalize the hsv values
         return np.hstack(
@@ -178,8 +178,7 @@ def to_feature_vector(images, feature_type):
 def run_gmm():
 
     images, masks = read_data()
-    train_set, val_set, test_set = split_dataset(
-        images, masks)
+    train_set, val_set, test_set = split_dataset(images, masks)
 
     # convert to pixels
     # train_data = np.concatenate([image.reshape(-1, 3)
@@ -306,34 +305,56 @@ def run_gmm():
                     #         f"Current best model: {best_feature} with {best_foreground_h} foreground and {best_background_h} background: {max_accuracy}")
 
 
-# def run_unet():
-#     images, masks = read_data()
-#     augmented_images, augmented_masks = augment_images(images, masks)
-#     # (
-#     #     train_images,
-#     #     train_masks,
-#     #     val_images,
-#     #     val_masks,
-#     #     test_images,
-#     #     test_masks,
-#     # ) = split_dataset(images, masks)
+def unet_get_checkpoint(path):
+    # get the name of the latest model
+    dirs = os.listdir(path)
+    if len(dirs) == 0:
+        return None
 
-#     train_set, val_set, test_set = split_dataset(
-#         augmented_images, augmented_masks)
+    return natsorted(dirs)[-1]
 
-#     batch_size = 2
 
-#     loader_args = dict(batch_size=batch_size, num_workers=4, pin_memory=True)
-#     train_loader = DataLoader(train_set, shuffle=True, **loader_args)
-#     val_loader = DataLoader(val_set, shuffle=False,
-#                             drop_last=True, **loader_args)
-#     unet = UNet(n_channels=3)
-#     unet.load_vgg_weights()
-#     unet.train(train_loader, epoch=10)
+def run_unet():
+    # define the save location and create the folders as required
+    save_path = "./models/unet/test"
+    os.makedirs(save_path, exist_ok=True)
+
+    images, masks = read_data()
+    augmented_images, augmented_masks = augment_images(images[:5], masks[:5], n=0)
+
+    # (
+    #     train_images,
+    #     train_masks,
+    #     val_images,
+    #     val_masks,
+    #     test_images,
+    #     test_masks,
+    # ) = split_dataset(images, masks)
+
+    train_set, val_set, test_set = split_dataset(augmented_images, augmented_masks)
+
+    batch_size = 1
+
+    loader_args = dict(batch_size=batch_size, num_workers=4, pin_memory=True)
+    train_loader = DataLoader(train_set, shuffle=True, **loader_args)
+    val_loader = DataLoader(val_set, shuffle=False, drop_last=True, **loader_args)
+    unet = UNet(n_channels=3)
+    unet.load_vgg_weights()
+
+    # check if the current save path has a checkpoint, if so, load from it
+    checkpoint = unet_get_checkpoint(save_path)
+    current_epoch = 0
+    if checkpoint:
+        current_epoch = unet.load_model(checkpoint)
+
+    unet.train(
+        train_loader, val_loader, save_path, max_epoch=10, current_epoch=current_epoch
+    )
 
     # in_image = np.rollaxis(train_images[0], 2)
     # out = unet(torch.from_numpy(in_image.astype(np.float32) / 255.0))
 
+
 if __name__ == "__main__":
-    run_gmm()
-    # run_unet()
+    # run_gmm()
+    run_unet()
