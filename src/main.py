@@ -41,10 +41,9 @@ def read_data():
 
 def split_dataset(images, masks):
     # split the images and masks into training validation and test with ration 70:15:15
-    # todo change back
-    training_count = int(round(len(images) * 0.6))
-    validation_count = int(round(len(images) * 0.2))
-    testing_count = int(round(len(images) * 0.2))
+    training_count = int(round(len(images) * 0.7))
+    validation_count = int(round(len(images) * 0.15))
+    testing_count = int(round(len(images) * 0.15))
 
     zipped_images = list(zip(images, masks))
     # Split images into train, test and validation
@@ -320,7 +319,7 @@ def run_unet():
     os.makedirs(save_path, exist_ok=True)
 
     images, masks = read_data()
-    augmented_images, augmented_masks = augment_images(images[:5], masks[:5], n=0)
+    augmented_images, augmented_masks = augment_images(images, masks, n=10)
 
     # (
     #     train_images,
@@ -345,9 +344,9 @@ def run_unet():
     checkpoint = unet_get_checkpoint(save_path)
     current_epoch = 0
     if checkpoint:
-        current_epoch = unet.load_model(checkpoint)
+        current_epoch = unet.load_model(f"{save_path}/{checkpoint}") + 1
 
-    unet.train(
+    unet.train_model(
         train_loader, val_loader, save_path, max_epoch=10, current_epoch=current_epoch
     )
 

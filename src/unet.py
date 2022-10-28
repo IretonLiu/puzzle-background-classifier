@@ -146,7 +146,7 @@ class UNet(nn.Module):
 
     def evaluate(self, val_data_loader):
         self.to(device=device)
-        super().eval()
+        self.eval()
 
         #
         val_loss = 0
@@ -193,10 +193,10 @@ class UNet(nn.Module):
                     val_loss += loss.item()
                     pbar.set_postfix(**{"loss (batch)": loss.item()})
 
-        super().train()
+        self.train()
         return val_loss
 
-    def train(
+    def train_model(
         self,
         train_data_loader,
         val_data_loader,
@@ -205,7 +205,7 @@ class UNet(nn.Module):
         current_epoch=0,
     ):
         self.to(device=device)
-        super().train()
+        self.train()
         for i in range(current_epoch, max_epoch):
             print("Starting epoch {}".format(i))
             epoch_loss = 0
