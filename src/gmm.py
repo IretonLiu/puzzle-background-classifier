@@ -42,7 +42,7 @@ class GaussianMixtureModel():
         self.covariances_ = np.random.rand(
             self.n_components, self.dim, self.dim)
         # make sure the matrix is symmetric
-        self.covariances_ = np.array(
+        self.covariances_ = 2*np.array(
             [(s + s.T)/2 for s in self.covariances_]) + self.dim*np.eye(self.dim)*10
 
     def fit(self, data):
@@ -72,9 +72,13 @@ class GaussianMixtureModel():
                                     for i in range(self.n_components)])
 
             # update the covariance
-            self.covariances_ = np.array([np.sum(r[i].T[:, None, None]*((data-self.means_[i])[..., None]*(data-self.means_[i])
-                                                 [:, None, :]), axis=0)/np.sum(r[i]) for i in range(self.n_components)])
-
+            for i in range(self.n_components):
+                self.covariances_[i] = np.dot(r[i]*(data-self.means_[i]).T,
+                                              data-self.means_[i])/np.sum(r[i])
+                self.covariances_[
+                    i] += np.eye(len(self.covariances_[i])) * 1e-9
+            # self.covariances_ = np.array([np.sum(r[i].T[:, None, None]*((data-self.means_[i])[..., None]*(data-self.means_[i])
+            #                                      [:, None, :]), axis=0)/np.sum(r[i]) for i in range(self.n_components)])
             # calculate the error
             print("Iteration: ", iter)
             error = np.average(np.array([np.max(np.abs(old_l-self.l)), np.max(
@@ -93,7 +97,7 @@ class GaussianMixtureModel():
         r = np.array([self.l[i]*norms[i].pdf(data)
                       for i in range(self.n_components)])
         # the denominator
-        r /= np.sum(r, axis=0)
+        r /= np.sum(r, axis=0, initial=1e-10)
 
         return r
 

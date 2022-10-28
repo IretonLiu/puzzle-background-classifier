@@ -1,8 +1,8 @@
 import glob
 import cv2
 import time
-from matplotlib.pyplot import scatter
-import matplotlib.pyplot as plt
+# from matplotlib.pyplot import scatter
+# import matplotlib.pyplot as plt
 import numpy as np
 from sklearn import cluster
 from sklearn.metrics import accuracy_score
@@ -11,7 +11,7 @@ from scipy.stats import multivariate_normal
 from ellipsoid import get_cov_ellipsoid
 from sklearn.mixture import GaussianMixture
 from classifier import Classifier
-from unet import UNet
+# from unet import UNet
 
 import torch
 from torch.utils.data import DataLoader, random_split
@@ -27,10 +27,12 @@ def read_data():
 
     # convert to images using cv2 and convert to float RGB
     images = np.array(
-        [cv2.cvtColor(cv2.imread(image), cv2.COLOR_BGR2RGB) for image in image_files]
+        [cv2.cvtColor(cv2.imread(image), cv2.COLOR_BGR2RGB)
+         for image in image_files]
     )
     masks = np.array(
-        [cv2.cvtColor(cv2.imread(mask), cv2.COLOR_BGR2GRAY) > 0 for mask in mask_files]
+        [cv2.cvtColor(cv2.imread(mask), cv2.COLOR_BGR2GRAY)
+         > 0 for mask in mask_files]
     )
 
     return images, masks
@@ -99,27 +101,29 @@ def augment_images(images, masks, n=10):
             augmented_masks.append(aug_mask)
 
     # add the original images
-    augmented_images = torch.cat((image_tensors, torch.stack(augmented_images)), dim=0)
-    augmented_masks = torch.cat((mask_tensors, torch.stack(augmented_masks)), dim=0)
+    augmented_images = torch.cat(
+        (image_tensors, torch.stack(augmented_images)), dim=0)
+    augmented_masks = torch.cat(
+        (mask_tensors, torch.stack(augmented_masks)), dim=0)
 
     return augmented_images, augmented_masks
 
 
-def scatter_plot(data, step, gmm=None):
-    # 3d scatter plot of train_data_foreground
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection="3d")
-    ax.scatter(data[::step, 0], data[::step, 1], data[::step, 2])
+# def scatter_plot(data, step, gmm=None):
+#     # 3d scatter plot of train_data_foreground
+#     fig = plt.figure()
+#     ax = fig.add_subplot(111, projection="3d")
+#     ax.scatter(data[::step, 0], data[::step, 1], data[::step, 2])
 
-    ax.set_xlabel("X Label")
-    ax.set_ylabel("Y Label")
-    ax.set_zlabel("Z Label")
-    if gmm:
-        for j in range(gmm.n_components):
-            # plot the gaussian
-            x, y, z = get_cov_ellipsoid(gmm.covariances_[j], gmm.means_[j])
-            ax.plot_wireframe(x, y, z, color="r", alpha=0.1)
-    plt.show()
+#     ax.set_xlabel("X Label")
+#     ax.set_ylabel("Y Label")
+#     ax.set_zlabel("Z Label")
+#     if gmm:
+#         for j in range(gmm.n_components):
+#             # plot the gaussian
+#             x, y, z = get_cov_ellipsoid(gmm.covariances_[j], gmm.means_[j])
+#             ax.plot_wireframe(x, y, z, color="r", alpha=0.1)
+#     plt.show()
 
 
 def to_feature_vector(images, feature_type):
@@ -141,12 +145,13 @@ def to_feature_vector(images, feature_type):
     elif feature_type == "rgb+dog":
         dog = np.array(
             [
-                cv2.GaussianBlur(image, (3, 3), 0) - cv2.GaussianBlur(image, (5, 5), 0)
+                cv2.GaussianBlur(image, (3, 3), 0) -
+                cv2.GaussianBlur(image, (5, 5), 0)
                 for image in float_images
             ]
         )
-        dog = np.array([(d - np.min(d)) / (np.max(d) - np.min(d)) for d in dog])
-        print(dog)
+        dog = np.array([(d - np.min(d)) / (np.max(d) - np.min(d))
+                       for d in dog])
         return np.hstack((float_images.reshape(-1, 3), dog.reshape(-1, 3)))
     elif feature_type == "hsv+xy":
         # convert float images to hsv
@@ -155,7 +160,8 @@ def to_feature_vector(images, feature_type):
         ).reshape(-1, 3)
         # a np array of the x and y coordinates
         xy = np.array(
-            [np.indices(image_dim[:2]).transpose((1, 2, 0)) for image in images]
+            [np.indices(image_dim[:2]).transpose((1, 2, 0))
+             for image in images]
         ).reshape(-1, 2)
         # normalize the hsv values
         return np.hstack(
@@ -172,30 +178,29 @@ def to_feature_vector(images, feature_type):
 def run_gmm():
 
     images, masks = read_data()
-    (
-        train_images,
-        val_images,
-        test_images,
-        train_masks,
-        val_masks,
-        test_masks,
-    ) = split_dataset(images, masks)
+    train_set, val_set, test_set = split_dataset(
+        images, masks)
 
     # convert to pixels
     # train_data = np.concatenate([image.reshape(-1, 3)
     #                              for image in train_images])
 
     # list of feature sets to use
-    features = ["rgb", "rgb+dog", "hsv", "hsv+xy"]
+    # features = ["rgb", "rgb+dog", "hsv", "hsv+xy"]
+    features = ["rgb+dog"]
 
     foreground_h_list = [3, 4, 5, 6, 7, 8, 9]
     background_h_list = [2, 3, 4, 5, 6]
+    train_images, train_masks = zip(*train_set)
+    train_images = np.array(train_images)
+    train_masks = np.array(train_masks)
     if 1:
 
         # fit the model
         for feature in features:
             print("Training with feature: {}".format(feature))
             # convert to feature vectors
+
             train_data = to_feature_vector(train_images, feature)
             train_data_masks = train_masks.reshape(-1, 1)
 
@@ -208,13 +213,14 @@ def run_gmm():
                 gmm_background = GaussianMixtureModel(
                     background_h, train_data_background.shape[1], max_iter=500, seed=4
                 )
-                try:
-                    gmm_background.fit(train_data_background)
-                except:
-                    print(
-                        "Failed to fit background GMM with h = {}".format(background_h)
-                    )
-                    continue
+                # try:
+                gmm_background.fit(train_data_background)
+                # except:
+                #     print(
+                #         "Failed to fit background GMM with h = {}".format(
+                #             background_h)
+                #     )
+                #     continue
                 print("Training time:", (time.time() - start_time))
                 gmm_background.save_model(
                     f"models/gmm/{feature}/background/{background_h}/"
@@ -253,12 +259,6 @@ def run_gmm():
             train_data = to_feature_vector(train_images, feature)
             train_data_masks = train_masks.reshape(-1, 1)
             train_data_foreground = train_data[train_data_masks[:, 0]]
-
-            plt.imshow(train_data_foreground[:6615184, :].reshape(2572, 2572, 3))
-            plt.show()
-            train_data_background = train_data[~train_data_masks[:, 0]]
-            plt.imshow(train_data_background[:19333609, :].reshape(4397, 4397, 3))
-            plt.show()
             classifier = Classifier(train_data, train_data_masks)
 
             for foreground_h in foreground_h_list:
@@ -270,7 +270,6 @@ def run_gmm():
                     f"models/gmm/{feature}/foreground/{foreground_h}/"
                 )
 
-                scatter_plot(train_data_foreground, 10000, gmm_foreground)
                 for background_h in background_h_list:
 
                     gmm_background = GaussianMixtureModel(
@@ -283,8 +282,6 @@ def run_gmm():
                     gmm_background.load_model(
                         f"models/gmm/{feature}/background/{background_h}/"
                     )
-
-                    scatter_plot(train_data_background, 1000, gmm_background)
 
                     # test the model
 
@@ -309,33 +306,34 @@ def run_gmm():
                     #         f"Current best model: {best_feature} with {best_foreground_h} foreground and {best_background_h} background: {max_accuracy}")
 
 
-def run_unet():
-    images, masks = read_data()
-    augmented_images, augmented_masks = augment_images(images, masks)
-    # (
-    #     train_images,
-    #     train_masks,
-    #     val_images,
-    #     val_masks,
-    #     test_images,
-    #     test_masks,
-    # ) = split_dataset(images, masks)
+# def run_unet():
+#     images, masks = read_data()
+#     augmented_images, augmented_masks = augment_images(images, masks)
+#     # (
+#     #     train_images,
+#     #     train_masks,
+#     #     val_images,
+#     #     val_masks,
+#     #     test_images,
+#     #     test_masks,
+#     # ) = split_dataset(images, masks)
 
-    train_set, val_set, test_set = split_dataset(augmented_images, augmented_masks)
+#     train_set, val_set, test_set = split_dataset(
+#         augmented_images, augmented_masks)
 
-    batch_size = 2
+#     batch_size = 2
 
-    loader_args = dict(batch_size=batch_size, num_workers=4, pin_memory=True)
-    train_loader = DataLoader(train_set, shuffle=True, **loader_args)
-    val_loader = DataLoader(val_set, shuffle=False, drop_last=True, **loader_args)
-    unet = UNet(n_channels=3)
-    unet.load_vgg_weights()
-    unet.train(train_loader, epoch=10)
+#     loader_args = dict(batch_size=batch_size, num_workers=4, pin_memory=True)
+#     train_loader = DataLoader(train_set, shuffle=True, **loader_args)
+#     val_loader = DataLoader(val_set, shuffle=False,
+#                             drop_last=True, **loader_args)
+#     unet = UNet(n_channels=3)
+#     unet.load_vgg_weights()
+#     unet.train(train_loader, epoch=10)
 
     # in_image = np.rollaxis(train_images[0], 2)
     # out = unet(torch.from_numpy(in_image.astype(np.float32) / 255.0))
 
-
 if __name__ == "__main__":
-    # run_gmm()
-    run_unet()
+    run_gmm()
+    # run_unet()
