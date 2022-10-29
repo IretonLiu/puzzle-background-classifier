@@ -84,6 +84,7 @@ class GaussianMixtureModel():
             error = np.average(np.array([np.max(np.abs(old_l-self.l)), np.max(
                 np.abs(old_mean-self.means_)), np.max(np.abs(old_covar-self.covariances_))]))
             print("error:", error)
+            print(flush=True, end="")   # flush the output
             iter += 1
 
     def reponsibility(self, data):

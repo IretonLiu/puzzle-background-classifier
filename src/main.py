@@ -229,34 +229,37 @@ def train_gmm(train_set, features, background_h_list, foreground_h_list,):
             train_data_foreground = train_data[train_data_masks[:, 0]]
             train_data_background = train_data[~train_data_masks[:, 0]]
 
-            for background_h in background_h_list:
-                print("Training background GMM with h = {}".format(background_h))
-                start_time = time.time()
-                gmm_background = GaussianMixtureModel(
-                    background_h, train_data_background.shape[1], max_iter=500, seed=4
-                )
-                gmm_background.fit(train_data_background)
-                print("Training time:", (time.time() - start_time))
-                gmm_background.save_model(
-                    f"models/gmm/{feature}/background/{background_h}/"
-                )
-                print(flush=True, end="")
-            for foreground_h in foreground_h_list:
-                print("Training foreground GMM with h = {}".format(foreground_h))
-                start_time = time.time()
-                gmm_foreground = GaussianMixtureModel(
-                    foreground_h, train_data_foreground.shape[1], max_iter=500, seed=2
-                )
-                try:
-                    gmm_foreground.fit(train_data_foreground)
-                except:
-                    print("Failed to fit foreground GMM with h = {}".format())
-                    continue
-                print("Training time:", (time.time() - start_time))
-                gmm_foreground.save_model(
-                    f"models/gmm/{feature}/foreground/{foreground_h}/"
-                )
-                print(flush=True, end="")
+            if 0:
+                for background_h in background_h_list:
+                    print("Training background GMM with h = {}".format(background_h))
+                    start_time = time.time()
+                    gmm_background = GaussianMixtureModel(
+                        background_h, train_data_background.shape[1], max_iter=500, seed=4
+                    )
+                    gmm_background.fit(train_data_background)
+                    print("Training time:", (time.time() - start_time))
+                    gmm_background.save_model(
+                        f"models/gmm/{feature}/background/{background_h}/"
+                    )
+                    print(flush=True, end="")
+
+            if 1:
+                for foreground_h in foreground_h_list:
+                    print("Training foreground GMM with h = {}".format(foreground_h))
+                    start_time = time.time()
+                    gmm_foreground = GaussianMixtureModel(
+                        foreground_h, train_data_foreground.shape[1], max_iter=500, seed=2
+                    )
+                    try:
+                        gmm_foreground.fit(train_data_foreground)
+                    except:
+                        print("Failed to fit foreground GMM with h = {}".format())
+                        continue
+                    print("Training time:", (time.time() - start_time))
+                    gmm_foreground.save_model(
+                        f"models/gmm/{feature}/foreground/{foreground_h}/"
+                    )
+                    print(flush=True, end="")
             print("=============================================================")
 
 
@@ -405,21 +408,21 @@ def run_gmm():
     # list of feature sets to use
     features = ["rgb", "rgb+dog", "hsv", "hsv+xy", "all"]
     # features = ["all"]
-    foreground_h_list = [3, 4, 5, 6]
+    foreground_h_list = [2, 3, 4, 5, 6, 7, 8]
     background_h_list = [2, 3, 4, 5, 6]
     train_gmm(train_set, features, background_h_list, foreground_h_list)
 
-    foreground_h_list = [3, 4, 5, 6]
-    background_h_list = [2, 3, 4, 5, 6]
-    # find optimal hyperparameters
+    # foreground_h_list = [3, 4, 5, 6]
+    # background_h_list = [2, 3, 4, 5, 6]
+    # # find optimal hyperparameters
 
-    best_feature, best_foreground_h, best_background_h = validate_gmm(
-        val_set, features, background_h_list, foreground_h_list)
-    best_feature = "all"
-    best_foreground_h = 4
-    best_background_h = 3
-    # test the model
-    test_gmm(test_set, best_feature, best_foreground_h, best_background_h)
+    # best_feature, best_foreground_h, best_background_h = validate_gmm(
+    #     val_set, features, background_h_list, foreground_h_list)
+    # best_feature = "all"
+    # best_foreground_h = 4
+    # best_background_h = 3
+    # # test the model
+    # test_gmm(test_set, best_feature, best_foreground_h, best_background_h)
 
 
 def unet_get_checkpoint(path):
