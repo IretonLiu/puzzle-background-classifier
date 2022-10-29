@@ -3,7 +3,7 @@ import cv2
 import time
 import os
 import glob
-from matplotlib import test
+import gc
 from natsort import natsorted
 from tqdm import tqdm
 from copy import deepcopy
@@ -22,7 +22,14 @@ import torch
 from torch.utils.data import DataLoader, random_split
 from torchvision import transforms as T
 
-from utils import confusion_matrix, accuracy, precision, recall, f1_score
+from utils import (
+    confusion_matrix,
+    accuracy,
+    precision,
+    recall,
+    f1_score,
+    free_gpu_memory,
+)
 
 res = (1024, 768)
 
@@ -459,13 +466,12 @@ def augmentation_wrapper(data, n):
 
     return output
 
-
 def run_unet(save_path, train_set, val_set, test_set, parameters):
-    train_set = augmentation_wrapper(train_set, n=parameters["augmentation_size"])
-    val_set = augmentation_wrapper(val_set, n=0)
-    test_set = augmentation_wrapper(test_set, n=0)
-    print("Loaded data", flush=True)
-
+    # train_set = augmentation_wrapper(train_set, n=parameters["augmentation_size"])
+    # val_set = augmentation_wrapper(val_set, n=0)
+    # test_set = augmentation_wrapper(test_set, n=0)
+    # print("Loaded data", flush=True)
+    
     batch_size = parameters["batch_size"]
 
     loader_args = dict(
@@ -496,10 +502,25 @@ def run_unet(save_path, train_set, val_set, test_set, parameters):
         train_loader,
         val_loader,
         save_path,
-        max_epoch=15,
+        max_epoch=3,
         current_epoch=current_epoch,
         threshold=0.5,
     )
+
+    # free the CUDA memory
+    print(torch.cuda.memory_summary())
+    free_gpu_memory(unet)
+    free_gpu_memory(train_loader)
+    free_gpu_memory(val_loader)
+    print(torch.cuda.memory_summary())
+
+    # prints currently alive Tensors and Variables
+    for obj in gc.get_objects():
+        try:
+            if torch.is_tensor(obj) or (hasattr(obj, 'data') and torch.is_tensor(obj.data)):
+                print(type(obj), obj.size())
+        except:
+            pass
 
     return training_loss, validation_loss, validation_accuracy, validation_f1_score
 
@@ -528,9 +549,10 @@ if __name__ == "__main__":
     # thresholds = [0.5, 0.75, 0.8, 0.9]
 
     # best params
-    best_validation_accuracy = -float("inf")
+    # (epoch, value)
+    best_validation_accuracy = (0, -float("inf"))
     best_accuracy_params = None
-    best_validation_f1score = -float("inf")
+    best_validation_f1score = (0, -float("inf"))
     best_f1score_params = None
 
     # do grid search
@@ -543,13 +565,20 @@ if __name__ == "__main__":
             f"Plots for a learning rate of {lr}\n(Batch Size changes per row; Augmentation Size changes per column)"
         )
 
-        for i, bs in enumerate(batch_sizes):
-            for j, aug_size in enumerate(augmentation_sizes):
+        for j, aug_size in enumerate(augmentation_sizes):
+            train_set = augmentation_wrapper(train_set, n=aug_size)
+            val_set = augmentation_wrapper(val_set, n=0)
+            test_set = augmentation_wrapper(test_set, n=0)
+            print(f"Loaded data for augmentation size {aug_size}", flush=True)
+
+            for i, bs in enumerate(batch_sizes):
                 # store the parameters
                 params = {"lr": lr, "batch_size": bs, "augmentation_size": aug_size}
 
+                print(f"\nTraining with {params}")
+
                 # define the save location and create the folders as required
-                save_path = f"./models/unet/params/{lr}_{bs}_{aug_size}"
+                save_path = f"./models/unet/test_params_1/{lr}_{bs}_{aug_size}"
                 os.makedirs(save_path, exist_ok=True)
 
                 # test this configuration
@@ -567,16 +596,18 @@ if __name__ == "__main__":
                 )
 
                 # record the best params
-                if validation_accuracy > best_validation_accuracy:
-                    best_validation_accuracy = validation_accuracy
-                    best_accuracy_params = params
+                for k in range(len(validation_accuracy)):
+                    if validation_accuracy[k] > best_validation_accuracy[1]:
+                        best_validation_accuracy = (k, validation_accuracy[k])
+                        best_accuracy_params = params
 
-                if validation_f1_score > best_validation_f1score:
-                    best_validation_f1score = validation_f1_score
-                    best_f1score_params = params
+                    if validation_f1_score[k] > best_validation_f1score[1]:
+                        best_validation_f1score = (k, validation_f1_score[k])
+                        best_f1score_params = params
 
                 # plot
                 ax[i, j].set_title(f"Batch size = {bs}; Augmentation_size = {aug_size}")
+                ax[i, j].set_xlabel("# Epochs")
                 ax[i, j].plot(training_loss, label="Training Loss")
                 ax[i, j].plot(validation_loss, label="Validation Loss")
                 ax[i, j].plot(validation_accuracy, label="Validation Accuracy")
@@ -588,10 +619,10 @@ if __name__ == "__main__":
 
     print("The best parameters are:")
     print(
-        f"Validation Accuracy {best_validation_accuracy} with params {best_accuracy_params}"
+        f"Validation Accuracy {best_validation_accuracy[1]} with params {best_accuracy_params} after Epoch {best_validation_accuracy[0]}"
     )
     print(
-        f"Validation F1 Score {best_validation_f1score} with params {best_f1score_params}"
+        f"Validation F1 Score {best_validation_f1score[1]} with params {best_f1score_params} after Epoch {best_validation_f1score[0]}"
     )
 
 """

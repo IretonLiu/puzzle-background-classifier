@@ -1,6 +1,13 @@
 from sklearn import metrics
 import numpy as np
+import gc 
+import torch
 
+def free_gpu_memory(data):
+    del data
+    data = None
+    gc.collect()
+    torch.cuda.empty_cache()
 
 def confusion_matrix(predicted_mask, true_mask, threshold=0.5):
     # count the number of pixels that were correctly classified

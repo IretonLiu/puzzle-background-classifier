@@ -5,7 +5,7 @@ from torchvision.models import vgg16, VGG16_Weights
 import torch
 from tqdm import tqdm
 import numpy as np
-from utils import confusion_matrix, accuracy, f1_score
+from utils import confusion_matrix, accuracy, f1_score, free_gpu_memory
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -192,16 +192,20 @@ class UNet(nn.Module):
                     loss = F.mse_loss(pred_masks, true_masks)
 
                     pbar.update(images.shape[0])
-                    val_loss += loss.item()
+                    val_loss += loss.detach().item()
                     pbar.set_postfix(**{"loss (batch)": loss.item()})
 
                     # loop through the images and get their confusion matrices
-                    pred_masks = pred_masks.to("cpu")
-                    true_masks = true_masks.to("cpu")
-                    for pred, true in zip(pred_masks, true_masks):
+                    pred_masks_cpu = pred_masks.to("cpu")
+                    true_masks_cpu = true_masks.to("cpu")
+                    for pred, true in zip(pred_masks_cpu, true_masks_cpu):
                         confusion_matrices += confusion_matrix(
                             pred.flatten(), true.flatten(), threshold
                         )
+
+                    free_gpu_memory(pred_masks)
+                    free_gpu_memory(true_masks)
+                    free_gpu_memory(images)
 
         self.train()
         return val_loss, confusion_matrices / np.sum(confusion_matrices)
@@ -233,7 +237,7 @@ class UNet(nn.Module):
             epoch_loss = 0
             # https://github.com/milesial/Pytorch-UNet/blob/master/train.py
             with tqdm(
-                total=len(train_data_loader), desc=f"Epoch {i}/{max_epoch}", unit="img"
+                total=len(train_data_loader), desc=f"Epoch {i}/{max_epoch-1}", unit="img"
             ) as pbar:
                 for batch in train_data_loader:
                     images = batch[0]
@@ -284,10 +288,14 @@ class UNet(nn.Module):
                     self.optimiser.step()
 
                     pbar.update(images.shape[0])
-                    epoch_loss += loss.item()
-                    pbar.set_postfix(**{"loss (batch)": loss.item()})
+                    epoch_loss += loss.detach().item()
+                    pbar.set_postfix(**{"loss (batch)": loss.detach().item()})
 
                     print("", end="", flush=True)
+
+                    free_gpu_memory(pred_masks)
+                    free_gpu_memory(true_masks)
+                    free_gpu_memory(images)
 
             # save model and to evaluation on validation data
             path = f"{save_path}/epoch_{i}.pt"
