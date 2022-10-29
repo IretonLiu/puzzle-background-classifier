@@ -2,6 +2,7 @@ import glob
 import cv2
 import time
 import os
+import glob
 from natsort import natsorted
 
 # from matplotlib.pyplot import scatter
@@ -53,18 +54,6 @@ def split_dataset(images, masks):
         generator=torch.Generator().manual_seed(0),
     )
 
-    # train_images, train_masks = zip(*train_set)
-    # val_images, val_masks = zip(*val_set)
-    # test_images, test_masks = zip(*test_set)
-
-    # return (
-    #     np.array(train_images),
-    #     np.array(train_masks),
-    #     np.array(val_images),
-    #     np.array(val_masks),
-    #     np.array(test_images),
-    #     np.array(test_masks),
-    # )
     return train_set, val_set, test_set
 
 
@@ -306,11 +295,21 @@ def run_gmm():
 
 def unet_get_checkpoint(path):
     # get the name of the latest model
-    dirs = os.listdir(path)
+    dirs = glob.glob(f"{path}/*.pt")
     if len(dirs) == 0:
         return None
 
     return natsorted(dirs)[-1]
+
+
+def convert_split_to_lists(data):
+    imgs = []
+    msks = []
+    for img, msk in data:
+        imgs.append(img)
+        msks.append(msk)
+
+    return np.array(imgs), np.array(msks)
 
 
 def run_unet():
@@ -319,18 +318,18 @@ def run_unet():
     os.makedirs(save_path, exist_ok=True)
 
     images, masks = read_data()
-    augmented_images, augmented_masks = augment_images(images, masks, n=10)
+    images = images.astype(np.float32) / 255.0
 
-    # (
-    #     train_images,
-    #     train_masks,
-    #     val_images,
-    #     val_masks,
-    #     test_images,
-    #     test_masks,
-    # ) = split_dataset(images, masks)
-
-    train_set, val_set, test_set = split_dataset(augmented_images, augmented_masks)
+    train_set, val_set, test_set = split_dataset(images, masks)
+    imgs, msks = convert_split_to_lists(train_set)
+    train_set = augment_images(imgs, msks, n=10)
+    imgs, msks = convert_split_to_lists(val_set)
+    val_set = augment_images(imgs, msks, n=0)
+    imgs, msks = convert_split_to_lists(test_set)
+    test_set = augment_images(imgs, msks, n=0)
+    print("Loaded data", flush=True)
+    # augmented_images, augmented_masks = augment_images(images, masks, n=10)
+    # train_set, val_set, test_set = split_dataset(augmented_images, augmented_masks)
 
     batch_size = 1
 
@@ -344,7 +343,7 @@ def run_unet():
     checkpoint = unet_get_checkpoint(save_path)
     current_epoch = 0
     if checkpoint:
-        current_epoch = unet.load_model(f"{save_path}/{checkpoint}") + 1
+        current_epoch = unet.load_model(checkpoint) + 1
 
     unet.train_model(
         train_loader, val_loader, save_path, max_epoch=10, current_epoch=current_epoch
@@ -357,3 +356,10 @@ def run_unet():
 if __name__ == "__main__":
     # run_gmm()
     run_unet()
+
+"""
+UNet hyperparameters to tune:
+- learning rate
+- batch size
+- amount of augmentation
+"""

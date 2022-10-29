@@ -1,21 +1,24 @@
 #!/bin/bash
-# partition name
-#SBATCH -p batch
-# number of nodes
-#SBATCH -N 1
-# or
-##SBATCH --nodes=2
-# number of cores
-##SBATCH -c 12
-# size of memory pool
-##SBATCH --mem 10
-# time limit for the job
-##SBATCH -t 5:00
-# job name
-#SBATCH -J gmm
-# name of output file
-#SBATCH -o /home-mscluster/iliu/CV/Assignment/output/%N.%j.out
-# name of error file
-#SBATCH -e /home-mscluster/iliu/CV/Assignment/error/%N.%j.out
+# file to manage running of slurm scripts
 
-python3 src/main.py
+# expect 2 inputs
+if [ $# != 2 ]
+then
+    echo "Usage: $0 <partition> <experiment folder>"
+    echo "Example: $0 batch test"
+    exit
+fi
+
+# specify the filepath to use
+filepath="./models/unet/$2"
+# make the directories as needed
+mkdir -p "$filepath"
+
+FILE=$filepath/cluster_output.log
+if test -f "$FILE"; then
+    echo "$FILE exists."
+    exit
+fi
+
+# run the file
+sbatch --partition=$1 --nodes=1 --job-name=$2 --output=$filepath/cluster_output.log --error=$filepath/cluster_error.log slurm.sh

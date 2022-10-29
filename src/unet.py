@@ -4,6 +4,8 @@ from torchvision.transforms.functional import crop
 from torchvision.models import vgg16, VGG16_Weights
 import torch
 from tqdm import tqdm
+import numpy as np
+from utils import confusion_matrix, accuracy, f1_score
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -141,19 +143,20 @@ class UNet(nn.Module):
         # map to 2 channels since there are 2 classes
         self.final = nn.Conv2d(64, 1, kernel_size=1)
 
-        #  Set up the optimizer, the loss, the learning rate scheduler and the loss scaling for AMP
+        #  Set up the optimizer
+        self.to(device=device)
         self.optimiser = torch.optim.Adam(self.parameters(), lr=learning_rate)
 
-    def evaluate(self, val_data_loader):
-        self.to(device=device)
+    def evaluate(self, val_data_loader, threshold=0.5):
         self.eval()
 
-        #
         val_loss = 0
+        confusion_matrices = np.zeros((2, 2))
         with tqdm(total=len(val_data_loader), desc=f"Validating", unit="img") as pbar:
             # evaluation - no need to track gradients
             with torch.no_grad():
                 for batch in val_data_loader:
+                    print(batch)
                     images = batch[0]
                     true_masks = batch[1]
 
@@ -193,8 +196,16 @@ class UNet(nn.Module):
                     val_loss += loss.item()
                     pbar.set_postfix(**{"loss (batch)": loss.item()})
 
+                    # loop through the images and get their confusion matrices
+                    pred_masks = pred_masks.to("cpu")
+                    true_masks = true_masks.to("cpu")
+                    for pred, true in zip(pred_masks, true_masks):
+                        confusion_matrices += confusion_matrix(pred, true, threshold)
+
         self.train()
-        return val_loss
+        print(confusion_matrices)
+        print(confusion_matrices / np.sum(confusion_matrices))
+        return val_loss, confusion_matrices / np.sum(confusion_matrices)
 
     def train_model(
         self,
@@ -203,67 +214,72 @@ class UNet(nn.Module):
         save_path,
         max_epoch=10,
         current_epoch=0,
+        threshold=0.5,
     ):
-        self.to(device=device)
         self.train()
         for i in range(current_epoch, max_epoch):
             print("Starting epoch {}".format(i))
             epoch_loss = 0
             # https://github.com/milesial/Pytorch-UNet/blob/master/train.py
-            with tqdm(
-                total=len(train_data_loader), desc=f"Epoch {i}/{max_epoch}", unit="img"
-            ) as pbar:
-                for batch in train_data_loader:
-                    images = batch[0]
-                    true_masks = batch[1]
+            # with tqdm(
+            #     total=len(train_data_loader), desc=f"Epoch {i}/{max_epoch}", unit="img"
+            # ) as pbar:
+            #     for batch in train_data_loader:
+            #         images = batch[0]
+            #         true_masks = batch[1]
 
-                    assert images.shape[1] == self.n_channels, (
-                        f"Network has been defined with {self.n_channels} input channels, "
-                        f"but loaded images have {images.shape[1]} channels. Please check that "
-                        "the images are loaded correctly."
-                    )
+            #         assert images.shape[1] == self.n_channels, (
+            #             f"Network has been defined with {self.n_channels} input channels, "
+            #             f"but loaded images have {images.shape[1]} channels. Please check that "
+            #             "the images are loaded correctly."
+            #         )
 
-                    images = images.to(device=device, dtype=torch.float32)
-                    true_masks = true_masks.to(device=device, dtype=torch.float32)
+            #         images = images.to(device=device, dtype=torch.float32)
+            #         true_masks = true_masks.to(device=device, dtype=torch.float32)
 
-                    pred_masks = self(images)
+            #         pred_masks = self(images)
 
-                    vert_dim = 2
-                    hori_dim = 3
-                    dim0_size_diff = (
-                        true_masks.size()[vert_dim] - pred_masks.size()[vert_dim]
-                    )
-                    dim1_size_diff = (
-                        true_masks.size()[hori_dim] - pred_masks.size()[hori_dim]
-                    )
+            #         vert_dim = 2
+            #         hori_dim = 3
+            #         dim0_size_diff = (
+            #             true_masks.size()[vert_dim] - pred_masks.size()[vert_dim]
+            #         )
+            #         dim1_size_diff = (
+            #             true_masks.size()[hori_dim] - pred_masks.size()[hori_dim]
+            #         )
 
-                    # crop the true masks
-                    if dim0_size_diff != 0 and dim1_size_diff != 0:
-                        true_masks = crop(
-                            true_masks,
-                            dim0_size_diff // 2,  # top left vertical component
-                            dim1_size_diff // 2,  # top left horizontal component
-                            pred_masks.size()[vert_dim],  # height of the cropped area
-                            pred_masks.size()[hori_dim],  # width of the cropped area
-                        )
+            #         # crop the true masks
+            #         if dim0_size_diff != 0 and dim1_size_diff != 0:
+            #             true_masks = crop(
+            #                 true_masks,
+            #                 dim0_size_diff // 2,  # top left vertical component
+            #                 dim1_size_diff // 2,  # top left horizontal component
+            #                 pred_masks.size()[vert_dim],  # height of the cropped area
+            #                 pred_masks.size()[hori_dim],  # width of the cropped area
+            #             )
 
-                    loss = F.mse_loss(pred_masks, true_masks)
+            #         loss = F.mse_loss(pred_masks, true_masks)
 
-                    self.optimiser.zero_grad()
-                    loss.backward()
-                    self.optimiser.step()
+            #         self.optimiser.zero_grad()
+            #         loss.backward()
+            #         self.optimiser.step()
 
-                    pbar.update(images.shape[0])
-                    epoch_loss += loss.item()
-                    pbar.set_postfix(**{"loss (batch)": loss.item()})
+            #         pbar.update(images.shape[0])
+            #         epoch_loss += loss.item()
+            #         pbar.set_postfix(**{"loss (batch)": loss.item()})
 
-            # save model and to evaluation on validation data
-            path = f"{save_path}/epoch_{i}.pt"
-            self.save_model(path, i)
-            val_loss = self.evaluate(val_data_loader)
+            #         print("", end="", flush=True)
+
+            # # save model and to evaluation on validation data
+            # path = f"{save_path}/epoch_{i}.pt"
+            # self.save_model(path, i)
+            val_loss, confusion_matrix = self.evaluate(val_data_loader, threshold)
             print(f"Epoch {i}:")
             print(f"\ttraining loss = {epoch_loss}")
             print(f"\tvalidation loss = {val_loss}")
+            print(f"\tvalidation accuracy = {accuracy(confusion_matrix)}")
+            print(f"\tvalidation F1 Score = {f1_score(confusion_matrix)}")
+            print("", end="", flush=True)
 
     def forward(self, x):
         # pass the image through the unet
@@ -338,7 +354,7 @@ class UNet(nn.Module):
         save the model to the specified dir
         """
 
-        print("saving model to", path)
+        # print("saving model to", path)
         torch.save(
             {
                 "epoch": epoch,
@@ -348,7 +364,7 @@ class UNet(nn.Module):
             path,
         )
 
-        print("model save to", path)
+        print("model saved to", path)
 
     def load_model(self, path):
         """
@@ -358,6 +374,7 @@ class UNet(nn.Module):
         print("loading model from", path)
         saved = torch.load(path)
         self.load_state_dict(saved["model_state_dict"])
+        self.to(device=device)
         self.optimiser.load_state_dict(saved["optimiser_state_dict"])
         print("model loaded from", path)
 
