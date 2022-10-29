@@ -1,6 +1,10 @@
 import glob
 import cv2
 import time
+import os
+import glob
+from natsort import natsorted
+
 # from matplotlib.pyplot import scatter
 # import matplotlib.pyplot as plt
 import numpy as np
@@ -52,18 +56,6 @@ def split_dataset(images, masks):
         generator=torch.Generator().manual_seed(0),
     )
 
-    # train_images, train_masks = zip(*train_set)
-    # val_images, val_masks = zip(*val_set)
-    # test_images, test_masks = zip(*test_set)
-
-    # return (
-    #     np.array(train_images),
-    #     np.array(train_masks),
-    #     np.array(val_images),
-    #     np.array(val_masks),
-    #     np.array(test_images),
-    #     np.array(test_masks),
-    # )
     return train_set, val_set, test_set
 
 
@@ -78,6 +70,9 @@ def augment_images(images, masks, n=10):
     # convert to tensors and rearrange to channels first
     image_tensors = torch.from_numpy(images).permute(0, 3, 1, 2)
     mask_tensors = torch.from_numpy(masks).unsqueeze(1)
+
+    if n <= 0:
+        return image_tensors, mask_tensors
 
     augmented_images = []
     augmented_masks = []
@@ -217,8 +212,7 @@ def post_processing(predictions, kernel_dims=3):
 def run_gmm():
 
     images, masks = read_data()
-    train_set, val_set, test_set = split_dataset(
-        images, masks)
+    train_set, val_set, test_set = split_dataset(images, masks)
 
     # convert to pixels
     # train_data = np.concatenate([image.reshape(-1, 3)
@@ -354,30 +348,70 @@ def run_gmm():
                             f"Current best model: {best_feature} with {best_foreground_h} foreground and {best_background_h} background: {max_accuracy}")
 
 
+def unet_get_checkpoint(path):
+    # get the name of the latest model
+    dirs = glob.glob(f"{path}/*.pt")
+    if len(dirs) == 0:
+        return None
+
+    return natsorted(dirs)[-1]
+
+
+def augmentation_wrapper(data, n):
+    # separate the current dataset
+    imgs = []
+    msks = []
+    for img, msk in data:
+        imgs.append(img)
+        msks.append(msk)
+
+    imgs = np.array(imgs)
+    msks = np.array(msks)
+
+    # do the augmentation
+    imgs, msks = augment_images(imgs, msks, n=n)
+
+    # repackage into a list of 2-tuples
+    output = []
+    for img, msk in zip(imgs, msks):
+        output.append((img, msk))
+
+    return output
+
+
 def run_unet():
+    # define the save location and create the folders as required
+    save_path = "./models/unet/test"
+    os.makedirs(save_path, exist_ok=True)
+
     images, masks = read_data()
-    augmented_images, augmented_masks = augment_images(images, masks)
-    # (
-    #     train_images,
-    #     train_masks,
-    #     val_images,
-    #     val_masks,
-    #     test_images,
-    #     test_masks,
-    # ) = split_dataset(images, masks)
+    images = images.astype(np.float32) / 255.0
 
-    train_set, val_set, test_set = split_dataset(
-        augmented_images, augmented_masks)
+    train_set, val_set, test_set = split_dataset(images, masks)
+    train_set = augmentation_wrapper(train_set, n=2)
+    val_set = augmentation_wrapper(val_set, n=0)
+    test_set = augmentation_wrapper(test_set, n=0)
+    print("Loaded data", flush=True)
 
-    batch_size = 2
+    batch_size = 1
 
     loader_args = dict(batch_size=batch_size, num_workers=4, pin_memory=True)
     train_loader = DataLoader(train_set, shuffle=True, **loader_args)
     val_loader = DataLoader(val_set, shuffle=False,
                             drop_last=True, **loader_args)
     unet = UNet(n_channels=3)
-    unet.load_vgg_weights()
-    unet.train(train_loader, epoch=10)
+
+    # check if the current save path has a checkpoint, if so, load from it
+    checkpoint = unet_get_checkpoint(save_path)
+    current_epoch = 0
+    if checkpoint:
+        current_epoch = unet.load_model(checkpoint) + 1
+    else:
+        unet.load_vgg_weights()
+
+    unet.train_model(
+        train_loader, val_loader, save_path, max_epoch=10, current_epoch=current_epoch
+    )
 
     # in_image = np.rollaxis(train_images[0], 2)
     # out = unet(torch.from_numpy(in_image.astype(np.float32) / 255.0))
@@ -386,3 +420,10 @@ def run_unet():
 if __name__ == "__main__":
     # run_gmm()
     run_unet()
+
+"""
+UNet hyperparameters to tune:
+- learning rate
+- batch size
+- amount of augmentation
+"""
