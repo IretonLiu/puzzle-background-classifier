@@ -11,7 +11,7 @@ from scipy.stats import multivariate_normal
 from ellipsoid import get_cov_ellipsoid
 from sklearn.mixture import GaussianMixture
 from classifier import Classifier
-# from unet import UNet
+from unet import UNet
 
 import torch
 from torch.utils.data import DataLoader, random_split
@@ -170,9 +170,48 @@ def to_feature_vector(images, feature_type):
                 xy.astype(np.float32) / np.array(image_dim[:2]),
             )
         )
+    elif feature_type == "all":
+        hsv = np.array(
+            [cv2.cvtColor(image, cv2.COLOR_RGB2HSV) for image in images]
+        ).reshape(-1, 3)
+        # a np array of the x and y coordinates
+        xy = np.array(
+            [np.indices(image_dim[:2]).transpose((1, 2, 0))
+             for image in images]
+        ).reshape(-1, 2)
+        dog = np.array(
+            [
+                cv2.GaussianBlur(image, (3, 3), 0) -
+                cv2.GaussianBlur(image, (5, 5), 0)
+                for image in float_images
+            ]
+        )
+        dog = np.array([(d - np.min(d)) / (np.max(d) - np.min(d))
+                       for d in dog])
 
+        # normalize the hsv values
+        return np.hstack(
+            (float_images.reshape(-1, 3),
+                hsv.astype(np.float32) / np.array([179, 255, 255]),
+                xy.astype(np.float32) / np.array(image_dim[:2]),
+                dog.reshape(-1, 3)
+             )
+        )
     else:
         raise ValueError("Unknown feature type")
+
+
+def post_processing(predictions, kernel_dims=3):
+    """Apply morhpolical transformations of closing
+    and opening"""
+    kernel = np.ones((kernel_dims, kernel_dims), np.uint8)
+    for i in range(len(predictions)):
+
+        predictions[i] = cv2.morphologyEx(
+            predictions[i], cv2.MORPH_OPEN, kernel)
+        predictions[i] = cv2.morphologyEx(
+            predictions[i], cv2.MORPH_CLOSE, kernel)
+    return predictions.reshape(-1, 1) > 0
 
 
 def run_gmm():
@@ -186,10 +225,10 @@ def run_gmm():
     #                              for image in train_images])
 
     # list of feature sets to use
-    # features = ["rgb", "rgb+dog", "hsv", "hsv+xy"]
-    features = ["rgb+dog"]
+    # features = ["rgb", "rgb+dog", "hsv", "hsv+xy", "all"]
+    features = ["all"]
 
-    foreground_h_list = [3, 4, 5, 6, 7, 8, 9]
+    foreground_h_list = [2, 3, 4, 5, 6]
     background_h_list = [2, 3, 4, 5, 6]
     train_images, train_masks = zip(*train_set)
     train_images = np.array(train_images)
@@ -226,7 +265,6 @@ def run_gmm():
                     f"models/gmm/{feature}/background/{background_h}/"
                 )
                 print(flush=True, end="")
-
             for foreground_h in foreground_h_list:
                 print("Training foreground GMM with h = {}".format(foreground_h))
                 start_time = time.time()
@@ -245,26 +283,33 @@ def run_gmm():
                 print(flush=True, end="")
             print("=============================================================")
 
-    # features = ["rgb"]
-    # foreground_h_list = [6, 7, 8, 9]
-    # background_h_list = [5, 6]
+    features = ["hsv"]
+    foreground_h_list = [3]
+    background_h_list = [2]
 
     if 0:
         best_feature = "None"
         best_background_h = -1
         best_foreground_h = -1
         max_accuracy = 0
-
+        val_images, val_masks = zip(*val_set)
+        val_images = np.array(val_images)
+        val_masks = np.array(val_masks)
+        # loop throug the features
         for feature in features:
-            train_data = to_feature_vector(train_images, feature)
-            train_data_masks = train_masks.reshape(-1, 1)
-            train_data_foreground = train_data[train_data_masks[:, 0]]
-            classifier = Classifier(train_data, train_data_masks)
+            val_data = to_feature_vector(val_images, feature)
+
+            val_data_masks = val_masks.reshape(-1, 1)
+
+            val_data_foreground = val_data[val_data_masks[:, 0]]
+            val_data_background = val_data[~val_data_masks[:, 0]]
+
+            classifier = Classifier(val_data, val_data_masks)
 
             for foreground_h in foreground_h_list:
 
                 gmm_foreground = GaussianMixtureModel(
-                    foreground_h, train_data_foreground.shape[1], max_iter=500, seed=2
+                    foreground_h, val_data_foreground.shape[1], max_iter=500, seed=2
                 )
                 gmm_foreground.load_model(
                     f"models/gmm/{feature}/foreground/{foreground_h}/"
@@ -274,7 +319,7 @@ def run_gmm():
 
                     gmm_background = GaussianMixtureModel(
                         background_h,
-                        train_data_background.shape[1],
+                        val_data_background.shape[1],
                         max_iter=500,
                         seed=4,
                     )
@@ -283,57 +328,61 @@ def run_gmm():
                         f"models/gmm/{feature}/background/{background_h}/"
                     )
 
-                    # test the model
+#                    test the model
 
-                    # likelihoods = [gmm_background, gmm_foreground]
-                    # protrain_imagesbabilities = classifier.maximum_a_posteriori(
-                    #     likelihoods)
-                    # predictions = np.argmax(probabilities, axis=0) == 1
+                    likelihoods = [gmm_background, gmm_foreground]
+                    probabilities = classifier.maximum_a_posteriori(
+                        likelihoods)
+                    predictions = np.argmax(probabilities, axis=0) == 1
+                    predictions = post_processing(
+                        predictions.reshape(val_masks.shape).astype(np.float32))
+                    # plt.imshow(predictions[0])
+                    # plt.show()
+                    accuracy_score = np.sum(
+                        predictions == val_data_masks) / len(val_data_masks)
 
-                    # accuracy_score = np.sum(
-                    #     predictions == train_data_masks[:, 0]) / len(train_data_masks)
+                    print(
+                        f"validation accuracy for {feature} with {foreground_h} foreground and {background_h} background: {accuracy_score}")
+                    # updated the best model
+                    if accuracy_score > max_accuracy:
+                        max_accuracy = accuracy_score
+                        best_feature = feature
+                        best_foreground_h = foreground_h
+                        best_background_h = background_h
 
-                    # print(
-                    #     f"Training accuracy for {feature} with {foreground_h} foreground and {background_h} background: {accuracy_score}")
-                    # # updated the best model
-                    # if accuracy_score > max_accuracy:
-                    #     max_accuracy = accuracy_score
-                    #     best_feature = feature
-                    #     best_foreground_h = foreground_h
-                    #     best_background_h = background_h
-
-                    #     print(
-                    #         f"Current best model: {best_feature} with {best_foreground_h} foreground and {best_background_h} background: {max_accuracy}")
+                        print(
+                            f"Current best model: {best_feature} with {best_foreground_h} foreground and {best_background_h} background: {max_accuracy}")
 
 
-# def run_unet():
-#     images, masks = read_data()
-#     augmented_images, augmented_masks = augment_images(images, masks)
-#     # (
-#     #     train_images,
-#     #     train_masks,
-#     #     val_images,
-#     #     val_masks,
-#     #     test_images,
-#     #     test_masks,
-#     # ) = split_dataset(images, masks)
+def run_unet():
+    images, masks = read_data()
+    augmented_images, augmented_masks = augment_images(images, masks)
+    # (
+    #     train_images,
+    #     train_masks,
+    #     val_images,
+    #     val_masks,
+    #     test_images,
+    #     test_masks,
+    # ) = split_dataset(images, masks)
 
-#     train_set, val_set, test_set = split_dataset(
-#         augmented_images, augmented_masks)
+    train_set, val_set, test_set = split_dataset(
+        augmented_images, augmented_masks)
 
-#     batch_size = 2
+    batch_size = 2
 
-#     loader_args = dict(batch_size=batch_size, num_workers=4, pin_memory=True)
-#     train_loader = DataLoader(train_set, shuffle=True, **loader_args)
-#     val_loader = DataLoader(val_set, shuffle=False,
-#                             drop_last=True, **loader_args)
-#     unet = UNet(n_channels=3)
-#     unet.load_vgg_weights()
-#     unet.train(train_loader, epoch=10)
+    loader_args = dict(batch_size=batch_size, num_workers=4, pin_memory=True)
+    train_loader = DataLoader(train_set, shuffle=True, **loader_args)
+    val_loader = DataLoader(val_set, shuffle=False,
+                            drop_last=True, **loader_args)
+    unet = UNet(n_channels=3)
+    unet.load_vgg_weights()
+    unet.train(train_loader, epoch=10)
 
     # in_image = np.rollaxis(train_images[0], 2)
     # out = unet(torch.from_numpy(in_image.astype(np.float32) / 255.0))
 
+
 if __name__ == "__main__":
-    run_gmm()
-    # run_unet()
+    # run_gmm()
+    run_unet()
