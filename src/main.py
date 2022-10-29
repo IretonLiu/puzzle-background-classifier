@@ -302,14 +302,26 @@ def unet_get_checkpoint(path):
     return natsorted(dirs)[-1]
 
 
-def convert_split_to_lists(data):
+def augmentation_wrapper(data, n):
+    # separate the current dataset
     imgs = []
     msks = []
     for img, msk in data:
         imgs.append(img)
         msks.append(msk)
 
-    return np.array(imgs), np.array(msks)
+    imgs = np.array(imgs)
+    msks = np.array(msks)
+
+    # do the augmentation
+    imgs, msks = augment_images(imgs, msks, n=n)
+
+    # repackage into a list of 2-tuples
+    output = []
+    for img, msk in zip(imgs, msks):
+        output.append((img, msk))
+
+    return output
 
 
 def run_unet():
@@ -321,15 +333,10 @@ def run_unet():
     images = images.astype(np.float32) / 255.0
 
     train_set, val_set, test_set = split_dataset(images, masks)
-    imgs, msks = convert_split_to_lists(train_set)
-    train_set = augment_images(imgs, msks, n=10)
-    imgs, msks = convert_split_to_lists(val_set)
-    val_set = augment_images(imgs, msks, n=0)
-    imgs, msks = convert_split_to_lists(test_set)
-    test_set = augment_images(imgs, msks, n=0)
+    train_set = augmentation_wrapper(train_set, n=2)
+    val_set = augmentation_wrapper(val_set, n=0)
+    test_set = augmentation_wrapper(test_set, n=0)
     print("Loaded data", flush=True)
-    # augmented_images, augmented_masks = augment_images(images, masks, n=10)
-    # train_set, val_set, test_set = split_dataset(augmented_images, augmented_masks)
 
     batch_size = 1
 
@@ -337,13 +344,14 @@ def run_unet():
     train_loader = DataLoader(train_set, shuffle=True, **loader_args)
     val_loader = DataLoader(val_set, shuffle=False, drop_last=True, **loader_args)
     unet = UNet(n_channels=3)
-    unet.load_vgg_weights()
 
     # check if the current save path has a checkpoint, if so, load from it
     checkpoint = unet_get_checkpoint(save_path)
     current_epoch = 0
     if checkpoint:
         current_epoch = unet.load_model(checkpoint) + 1
+    else:
+        unet.load_vgg_weights()
 
     unet.train_model(
         train_loader, val_loader, save_path, max_epoch=10, current_epoch=current_epoch

@@ -156,7 +156,6 @@ class UNet(nn.Module):
             # evaluation - no need to track gradients
             with torch.no_grad():
                 for batch in val_data_loader:
-                    print(batch)
                     images = batch[0]
                     true_masks = batch[1]
 
@@ -200,11 +199,9 @@ class UNet(nn.Module):
                     pred_masks = pred_masks.to("cpu")
                     true_masks = true_masks.to("cpu")
                     for pred, true in zip(pred_masks, true_masks):
-                        confusion_matrices += confusion_matrix(pred, true, threshold)
+                        confusion_matrices += confusion_matrix(pred.flatten(), true.flatten(), threshold)
 
         self.train()
-        print(confusion_matrices)
-        print(confusion_matrices / np.sum(confusion_matrices))
         return val_loss, confusion_matrices / np.sum(confusion_matrices)
 
     def train_model(
@@ -221,64 +218,64 @@ class UNet(nn.Module):
             print("Starting epoch {}".format(i))
             epoch_loss = 0
             # https://github.com/milesial/Pytorch-UNet/blob/master/train.py
-            # with tqdm(
-            #     total=len(train_data_loader), desc=f"Epoch {i}/{max_epoch}", unit="img"
-            # ) as pbar:
-            #     for batch in train_data_loader:
-            #         images = batch[0]
-            #         true_masks = batch[1]
+            with tqdm(
+                total=len(train_data_loader), desc=f"Epoch {i}/{max_epoch}", unit="img"
+            ) as pbar:
+                for batch in train_data_loader:
+                    images = batch[0]
+                    true_masks = batch[1]
 
-            #         assert images.shape[1] == self.n_channels, (
-            #             f"Network has been defined with {self.n_channels} input channels, "
-            #             f"but loaded images have {images.shape[1]} channels. Please check that "
-            #             "the images are loaded correctly."
-            #         )
+                    assert images.shape[1] == self.n_channels, (
+                        f"Network has been defined with {self.n_channels} input channels, "
+                        f"but loaded images have {images.shape[1]} channels. Please check that "
+                        "the images are loaded correctly."
+                    )
 
-            #         images = images.to(device=device, dtype=torch.float32)
-            #         true_masks = true_masks.to(device=device, dtype=torch.float32)
+                    images = images.to(device=device, dtype=torch.float32)
+                    true_masks = true_masks.to(device=device, dtype=torch.float32)
 
-            #         pred_masks = self(images)
+                    pred_masks = self(images)
 
-            #         vert_dim = 2
-            #         hori_dim = 3
-            #         dim0_size_diff = (
-            #             true_masks.size()[vert_dim] - pred_masks.size()[vert_dim]
-            #         )
-            #         dim1_size_diff = (
-            #             true_masks.size()[hori_dim] - pred_masks.size()[hori_dim]
-            #         )
+                    vert_dim = 2
+                    hori_dim = 3
+                    dim0_size_diff = (
+                        true_masks.size()[vert_dim] - pred_masks.size()[vert_dim]
+                    )
+                    dim1_size_diff = (
+                        true_masks.size()[hori_dim] - pred_masks.size()[hori_dim]
+                    )
 
-            #         # crop the true masks
-            #         if dim0_size_diff != 0 and dim1_size_diff != 0:
-            #             true_masks = crop(
-            #                 true_masks,
-            #                 dim0_size_diff // 2,  # top left vertical component
-            #                 dim1_size_diff // 2,  # top left horizontal component
-            #                 pred_masks.size()[vert_dim],  # height of the cropped area
-            #                 pred_masks.size()[hori_dim],  # width of the cropped area
-            #             )
+                    # crop the true masks
+                    if dim0_size_diff != 0 and dim1_size_diff != 0:
+                        true_masks = crop(
+                            true_masks,
+                            dim0_size_diff // 2,  # top left vertical component
+                            dim1_size_diff // 2,  # top left horizontal component
+                            pred_masks.size()[vert_dim],  # height of the cropped area
+                            pred_masks.size()[hori_dim],  # width of the cropped area
+                        )
 
-            #         loss = F.mse_loss(pred_masks, true_masks)
+                    loss = F.mse_loss(pred_masks, true_masks)
 
-            #         self.optimiser.zero_grad()
-            #         loss.backward()
-            #         self.optimiser.step()
+                    self.optimiser.zero_grad()
+                    loss.backward()
+                    self.optimiser.step()
 
-            #         pbar.update(images.shape[0])
-            #         epoch_loss += loss.item()
-            #         pbar.set_postfix(**{"loss (batch)": loss.item()})
+                    pbar.update(images.shape[0])
+                    epoch_loss += loss.item()
+                    pbar.set_postfix(**{"loss (batch)": loss.item()})
 
-            #         print("", end="", flush=True)
+                    print("", end="", flush=True)
 
-            # # save model and to evaluation on validation data
-            # path = f"{save_path}/epoch_{i}.pt"
-            # self.save_model(path, i)
-            val_loss, confusion_matrix = self.evaluate(val_data_loader, threshold)
+            # save model and to evaluation on validation data
+            path = f"{save_path}/epoch_{i}.pt"
+            self.save_model(path, i)
+            val_loss, matrix = self.evaluate(val_data_loader, threshold)
             print(f"Epoch {i}:")
             print(f"\ttraining loss = {epoch_loss}")
             print(f"\tvalidation loss = {val_loss}")
-            print(f"\tvalidation accuracy = {accuracy(confusion_matrix)}")
-            print(f"\tvalidation F1 Score = {f1_score(confusion_matrix)}")
+            print(f"\tvalidation accuracy = {accuracy(matrix)}")
+            print(f"\tvalidation F1 Score = {f1_score(matrix)}")
             print("", end="", flush=True)
 
     def forward(self, x):
@@ -372,7 +369,7 @@ class UNet(nn.Module):
         """
 
         print("loading model from", path)
-        saved = torch.load(path)
+        saved = torch.load(path, map_location=device)
         self.load_state_dict(saved["model_state_dict"])
         self.to(device=device)
         self.optimiser.load_state_dict(saved["optimiser_state_dict"])
