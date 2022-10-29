@@ -3,13 +3,12 @@ import cv2
 import time
 import os
 import glob
+from matplotlib import test
 from natsort import natsorted
 
 # from matplotlib.pyplot import scatter
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 import numpy as np
-from sklearn import cluster
-from sklearn.metrics import accuracy_score
 from gmm import GaussianMixtureModel
 from scipy.stats import multivariate_normal
 from ellipsoid import get_cov_ellipsoid
@@ -21,13 +20,15 @@ import torch
 from torch.utils.data import DataLoader, random_split
 from torchvision import transforms as T
 
+from utils import confusion_matrix, accuracy, precision, recall, f1_score
+
 res = (1024, 768)
 
 
 def read_data():
     # glob all images from data
-    image_files = glob.glob("data/images-1024x768/*.png")
-    mask_files = glob.glob("data/masks-1024x768/*.png")
+    image_files = natsorted(glob.glob("data/images-1024x768/*.png"))
+    mask_files = natsorted(glob.glob("data/masks-1024x768/*.png"))
 
     # convert to images using cv2 and convert to float RGB
     images = np.array(
@@ -49,6 +50,7 @@ def split_dataset(images, masks):
     testing_count = int(round(len(images) * 0.15))
 
     zipped_images = list(zip(images, masks))
+
     # Split images into train, test and validation
     train_set, val_set, test_set = random_split(
         zipped_images,
@@ -196,7 +198,7 @@ def to_feature_vector(images, feature_type):
         raise ValueError("Unknown feature type")
 
 
-def post_processing(predictions, kernel_dims=3):
+def post_processing(predictions, kernel_dims=5):
     """Apply morhpolical transformations of closing
     and opening"""
     kernel = np.ones((kernel_dims, kernel_dims), np.uint8)
@@ -206,28 +208,15 @@ def post_processing(predictions, kernel_dims=3):
             predictions[i], cv2.MORPH_OPEN, kernel)
         predictions[i] = cv2.morphologyEx(
             predictions[i], cv2.MORPH_CLOSE, kernel)
-    return predictions.reshape(-1, 1) > 0
+
+    return predictions.reshape(-1, 1)
 
 
-def run_gmm():
-
-    images, masks = read_data()
-    train_set, val_set, test_set = split_dataset(images, masks)
-
-    # convert to pixels
-    # train_data = np.concatenate([image.reshape(-1, 3)
-    #                              for image in train_images])
-
-    # list of feature sets to use
-    # features = ["rgb", "rgb+dog", "hsv", "hsv+xy", "all"]
-    features = ["all"]
-
-    foreground_h_list = [2, 3, 4, 5, 6]
-    background_h_list = [2, 3, 4, 5, 6]
+def train_gmm(train_set, features, background_h_list, foreground_h_list,):
     train_images, train_masks = zip(*train_set)
     train_images = np.array(train_images)
     train_masks = np.array(train_masks)
-    if 1:
+    if 0:
 
         # fit the model
         for feature in features:
@@ -246,14 +235,7 @@ def run_gmm():
                 gmm_background = GaussianMixtureModel(
                     background_h, train_data_background.shape[1], max_iter=500, seed=4
                 )
-                # try:
                 gmm_background.fit(train_data_background)
-                # except:
-                #     print(
-                #         "Failed to fit background GMM with h = {}".format(
-                #             background_h)
-                #     )
-                #     continue
                 print("Training time:", (time.time() - start_time))
                 gmm_background.save_model(
                     f"models/gmm/{feature}/background/{background_h}/"
@@ -277,75 +259,167 @@ def run_gmm():
                 print(flush=True, end="")
             print("=============================================================")
 
-    features = ["hsv"]
-    foreground_h_list = [3]
-    background_h_list = [2]
 
-    if 0:
-        best_feature = "None"
-        best_background_h = -1
-        best_foreground_h = -1
-        max_accuracy = 0
-        val_images, val_masks = zip(*val_set)
-        val_images = np.array(val_images)
-        val_masks = np.array(val_masks)
-        # loop throug the features
-        for feature in features:
-            val_data = to_feature_vector(val_images, feature)
+def validate_gmm(val_set, features, background_h_list, foreground_h_list):
+    best_feature = "None"
+    best_background_h = -1
+    best_foreground_h = -1
+    max_accuracy = 0
+    val_images, val_masks = zip(*val_set)
+    val_images = np.array(val_images)
+    val_masks = np.array(val_masks)
 
-            val_data_masks = val_masks.reshape(-1, 1)
+    # loop throug the features
+    for feature in features:
+        val_data = to_feature_vector(val_images, feature)
 
-            val_data_foreground = val_data[val_data_masks[:, 0]]
-            val_data_background = val_data[~val_data_masks[:, 0]]
+        val_data_masks = val_masks.reshape(-1, 1)
 
-            classifier = Classifier(val_data, val_data_masks)
+        val_data_foreground = val_data[val_data_masks[:, 0]]
+        val_data_background = val_data[~val_data_masks[:, 0]]
 
-            for foreground_h in foreground_h_list:
+        classifier = Classifier(val_data, val_data_masks)
 
-                gmm_foreground = GaussianMixtureModel(
-                    foreground_h, val_data_foreground.shape[1], max_iter=500, seed=2
+        for foreground_h in foreground_h_list:
+
+            gmm_foreground = GaussianMixtureModel(
+                foreground_h, val_data_foreground.shape[1], max_iter=500, seed=2
+            )
+            gmm_foreground.load_model(
+                f"models/gmm/{feature}/foreground/{foreground_h}/"
+            )
+
+            for background_h in background_h_list:
+
+                gmm_background = GaussianMixtureModel(
+                    background_h,
+                    val_data_background.shape[1],
+                    max_iter=500,
+                    seed=4,
                 )
-                gmm_foreground.load_model(
-                    f"models/gmm/{feature}/foreground/{foreground_h}/"
+
+                gmm_background.load_model(
+                    f"models/gmm/{feature}/background/{background_h}/"
                 )
-
-                for background_h in background_h_list:
-
-                    gmm_background = GaussianMixtureModel(
-                        background_h,
-                        val_data_background.shape[1],
-                        max_iter=500,
-                        seed=4,
-                    )
-
-                    gmm_background.load_model(
-                        f"models/gmm/{feature}/background/{background_h}/"
-                    )
 
 #                    test the model
+                likelihoods = [gmm_background, gmm_foreground]
+                probabilities = classifier.maximum_a_posteriori(
+                    likelihoods)
+                predictions = np.argmax(probabilities, axis=0) == 1
+                predictions = post_processing(
+                    predictions.reshape(val_masks.shape).astype(np.float32))
 
-                    likelihoods = [gmm_background, gmm_foreground]
-                    probabilities = classifier.maximum_a_posteriori(
-                        likelihoods)
-                    predictions = np.argmax(probabilities, axis=0) == 1
-                    predictions = post_processing(
-                        predictions.reshape(val_masks.shape).astype(np.float32))
-                    # plt.imshow(predictions[0])
-                    # plt.show()
-                    accuracy_score = np.sum(
-                        predictions == val_data_masks) / len(val_data_masks)
+                accuracy_score = np.sum(
+                    predictions == val_data_masks) / len(val_data_masks)
+
+                print(
+                    f"validation accuracy for {feature} with {foreground_h} foreground and {background_h} background: {accuracy_score}")
+                # updated the best model
+                if accuracy_score > max_accuracy:
+                    max_accuracy = accuracy_score
+                    best_feature = feature
+                    best_foreground_h = foreground_h
+                    best_background_h = background_h
 
                     print(
-                        f"validation accuracy for {feature} with {foreground_h} foreground and {background_h} background: {accuracy_score}")
-                    # updated the best model
-                    if accuracy_score > max_accuracy:
-                        max_accuracy = accuracy_score
-                        best_feature = feature
-                        best_foreground_h = foreground_h
-                        best_background_h = background_h
+                        f"Current best model: {best_feature} with {best_foreground_h} foreground and {best_background_h} background: {max_accuracy}")
+    print("Best model: {} with {} foreground and {} background: {}".format(
+        best_feature, best_foreground_h, best_background_h, max_accuracy))
+    return best_feature, best_foreground_h, best_background_h
 
-                        print(
-                            f"Current best model: {best_feature} with {best_foreground_h} foreground and {best_background_h} background: {max_accuracy}")
+
+def test_gmm(test_set, best_feature, best_foreground_h, best_background_h):
+    test_images, test_masks = zip(*test_set)
+    test_images = np.array(test_images)
+    test_masks = np.array(test_masks)
+
+    test_data = to_feature_vector(test_images, best_feature)
+    test_data_masks = test_masks.reshape(-1, 1)
+
+    test_data_foreground = test_data[test_data_masks[:, 0]]
+    test_data_background = test_data[~test_data_masks[:, 0]]
+
+    classifier = Classifier(test_data, test_data_masks)
+
+    gmm_foreground = GaussianMixtureModel(
+        best_foreground_h, test_data_foreground.shape[1], max_iter=500, seed=2
+    )
+    gmm_foreground.load_model(
+        f"models/gmm/{best_feature}/foreground/{best_foreground_h}/"
+    )
+
+    gmm_background = GaussianMixtureModel(
+        best_background_h,
+        test_data_background.shape[1],
+        max_iter=500,
+        seed=4,
+    )
+
+    gmm_background.load_model(
+        f"models/gmm/{best_feature}/background/{best_background_h}/"
+    )
+
+    # test the model
+    likelihoods = [gmm_background, gmm_foreground]
+    probabilities = classifier.maximum_a_posteriori(likelihoods)
+    predictions = np.argmax(probabilities, axis=0) == 1
+    predictions = post_processing(
+        predictions.reshape(test_masks.shape).astype(np.float32))
+
+    predictions = predictions.reshape(
+        (len(test_masks), -1)).astype(np.float32)
+    test_masks = test_masks.reshape((len(test_masks), -1))
+    for prediction, mask in zip(predictions, test_masks):
+        # plot prediction and mask side by side
+        plt.figure(figsize=(10, 10))
+        plt.subplot(1, 2, 1)
+        plt.imshow(prediction.reshape(768, 1024))
+        plt.subplot(1, 2, 2)
+        plt.imshow(mask.reshape(768, 1024))
+        plt.show()
+
+        c_matrix = confusion_matrix(mask, prediction)
+        accuracy_score = accuracy(c_matrix)
+        precision_score = precision(c_matrix)
+        recall_score = recall(c_matrix)
+        print("Confusion matrix:")
+        print(c_matrix)
+        print("Accuracy score:", accuracy_score)
+        print("Precision score:", precision_score)
+        print("Recall score:", recall_score)
+
+
+def run_gmm():
+
+    images, masks = read_data()
+    train_set, val_set, test_set = split_dataset(images, masks)
+    # for image, mask in train_set:
+    #     plt.figure(figsize=(10, 10))
+    #     plt.subplot(1, 2, 1)
+    #     plt.imshow(image)
+    #     plt.subplot(1, 2, 2)
+    #     plt.imshow(mask)
+    #     plt.show()
+    # hyperparameters
+    # list of feature sets to use
+    features = ["rgb", "rgb+dog", "hsv", "hsv+xy", "all"]
+    # features = ["all"]
+    foreground_h_list = [3, 4, 5, 6]
+    background_h_list = [2, 3, 4, 5, 6]
+    train_gmm(train_set, features, background_h_list, foreground_h_list)
+
+    foreground_h_list = [3, 4, 5, 6]
+    background_h_list = [2, 3, 4, 5, 6]
+    # find optimal hyperparameters
+
+    best_feature, best_foreground_h, best_background_h = validate_gmm(
+        val_set, features, background_h_list, foreground_h_list)
+    best_feature = "all"
+    best_foreground_h = 4
+    best_background_h = 3
+    # test the model
+    test_gmm(test_set, best_feature, best_foreground_h, best_background_h)
 
 
 def unet_get_checkpoint(path):
@@ -418,8 +492,8 @@ def run_unet():
 
 
 if __name__ == "__main__":
-    # run_gmm()
-    run_unet()
+    run_gmm()
+    # run_unet()
 
 """
 UNet hyperparameters to tune:
