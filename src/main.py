@@ -3,8 +3,10 @@ import cv2
 import time
 import os
 import glob
-from matplotlib import test
+import gc
 from natsort import natsorted
+from tqdm import tqdm
+from copy import deepcopy
 
 # from matplotlib.pyplot import scatter
 import matplotlib.pyplot as plt
@@ -20,7 +22,14 @@ import torch
 from torch.utils.data import DataLoader, random_split
 from torchvision import transforms as T
 
-from utils import confusion_matrix, accuracy, precision, recall, f1_score
+from utils import (
+    confusion_matrix,
+    accuracy,
+    precision,
+    recall,
+    f1_score,
+    free_gpu_memory,
+)
 
 res = (1024, 768)
 
@@ -78,24 +87,28 @@ def augment_images(images, masks, n=10):
 
     augmented_images = []
     augmented_masks = []
-    for image_tensor, mask_tensor in zip(image_tensors, mask_tensors):
+    with tqdm(total=len(images) * n, desc=f"Transforming Images", unit="img") as pbar:
+        for image_tensor, mask_tensor in zip(image_tensors, mask_tensors):
 
-        for i in range(n):
-            # get the affine transformation parameters
-            params = T.RandomAffine.get_params(
-                degrees=(-180, 180),
-                translate=(0.3, 0.3),
-                scale_ranges=None,
-                shears=None,
-                img_size=image_tensor.size(),
-            )
+            for i in range(n):
+                # get the affine transformation parameters
+                params = T.RandomAffine.get_params(
+                    degrees=(-180, 180),
+                    translate=(0.3, 0.3),
+                    scale_ranges=None,
+                    shears=None,
+                    img_size=image_tensor.size(),
+                )
 
-            # apply the affine transformation
-            aug_image = T.functional.affine(image_tensor, *params)
-            aug_mask = T.functional.affine(mask_tensor, *params)
+                # apply the affine transformation
+                aug_image = T.functional.affine(image_tensor, *params)
+                aug_mask = T.functional.affine(mask_tensor, *params)
 
-            augmented_images.append(aug_image)
-            augmented_masks.append(aug_mask)
+                augmented_images.append(aug_image)
+                augmented_masks.append(aug_mask)
+
+                pbar.update()
+                print("", end="", flush=True)
 
     # add the original images
     augmented_images = torch.cat(
@@ -188,11 +201,12 @@ def to_feature_vector(images, feature_type):
 
         # normalize the hsv values
         return np.hstack(
-            (float_images.reshape(-1, 3),
+            (
+                float_images.reshape(-1, 3),
                 hsv.astype(np.float32) / np.array([179, 255, 255]),
                 xy.astype(np.float32) / np.array(image_dim[:2]),
-                dog.reshape(-1, 3)
-             )
+                dog.reshape(-1, 3),
+            )
         )
     else:
         raise ValueError("Unknown feature type")
@@ -212,7 +226,12 @@ def post_processing(predictions, kernel_dims=5):
     return predictions.reshape(-1, 1)
 
 
-def train_gmm(train_set, features, background_h_list, foreground_h_list,):
+def train_gmm(
+    train_set,
+    features,
+    background_h_list,
+    foreground_h_list,
+):
     train_images, train_masks = zip(*train_set)
     train_images = np.array(train_images)
     train_masks = np.array(train_masks)
@@ -305,19 +324,21 @@ def validate_gmm(val_set, features, background_h_list, foreground_h_list):
                     f"models/gmm/{feature}/background/{background_h}/"
                 )
 
-#                    test the model
+                #                    test the model
                 likelihoods = [gmm_background, gmm_foreground]
-                probabilities = classifier.maximum_a_posteriori(
-                    likelihoods)
+                probabilities = classifier.maximum_a_posteriori(likelihoods)
                 predictions = np.argmax(probabilities, axis=0) == 1
                 predictions = post_processing(
-                    predictions.reshape(val_masks.shape).astype(np.float32))
+                    predictions.reshape(val_masks.shape).astype(np.float32)
+                )
 
-                accuracy_score = np.sum(
-                    predictions == val_data_masks) / len(val_data_masks)
+                accuracy_score = np.sum(predictions == val_data_masks) / len(
+                    val_data_masks
+                )
 
                 print(
-                    f"validation accuracy for {feature} with {foreground_h} foreground and {background_h} background: {accuracy_score}")
+                    f"validation accuracy for {feature} with {foreground_h} foreground and {background_h} background: {accuracy_score}"
+                )
                 # updated the best model
                 if accuracy_score > max_accuracy:
                     max_accuracy = accuracy_score
@@ -326,9 +347,13 @@ def validate_gmm(val_set, features, background_h_list, foreground_h_list):
                     best_background_h = background_h
 
                     print(
-                        f"Current best model: {best_feature} with {best_foreground_h} foreground and {best_background_h} background: {max_accuracy}")
-    print("Best model: {} with {} foreground and {} background: {}".format(
-        best_feature, best_foreground_h, best_background_h, max_accuracy))
+                        f"Current best model: {best_feature} with {best_foreground_h} foreground and {best_background_h} background: {max_accuracy}"
+                    )
+    print(
+        "Best model: {} with {} foreground and {} background: {}".format(
+            best_feature, best_foreground_h, best_background_h, max_accuracy
+        )
+    )
     return best_feature, best_foreground_h, best_background_h
 
 
@@ -368,10 +393,10 @@ def test_gmm(test_set, best_feature, best_foreground_h, best_background_h):
     probabilities = classifier.maximum_a_posteriori(likelihoods)
     predictions = np.argmax(probabilities, axis=0) == 1
     predictions = post_processing(
-        predictions.reshape(test_masks.shape).astype(np.float32))
+        predictions.reshape(test_masks.shape).astype(np.float32)
+    )
 
-    predictions = predictions.reshape(
-        (len(test_masks), -1)).astype(np.float32)
+    predictions = predictions.reshape((len(test_masks), -1)).astype(np.float32)
     test_masks = test_masks.reshape((len(test_masks), -1))
     for prediction, mask in zip(predictions, test_masks):
         # plot prediction and mask side by side
@@ -456,27 +481,25 @@ def augmentation_wrapper(data, n):
     return output
 
 
-def run_unet():
-    # define the save location and create the folders as required
-    save_path = "./models/unet/test"
-    os.makedirs(save_path, exist_ok=True)
+def run_unet(save_path, train_set, val_set, test_set, parameters):
+    # train_set = augmentation_wrapper(train_set, n=parameters["augmentation_size"])
+    # val_set = augmentation_wrapper(val_set, n=0)
+    # test_set = augmentation_wrapper(test_set, n=0)
+    # print("Loaded data", flush=True)
 
-    images, masks = read_data()
-    images = images.astype(np.float32) / 255.0
+    batch_size = parameters["batch_size"]
 
-    train_set, val_set, test_set = split_dataset(images, masks)
-    train_set = augmentation_wrapper(train_set, n=2)
-    val_set = augmentation_wrapper(val_set, n=0)
-    test_set = augmentation_wrapper(test_set, n=0)
-    print("Loaded data", flush=True)
-
-    batch_size = 1
-
-    loader_args = dict(batch_size=batch_size, num_workers=4, pin_memory=True)
-    train_loader = DataLoader(train_set, shuffle=True, **loader_args)
+    loader_args = dict(
+        num_workers=4,
+        pin_memory=True,
+        drop_last=True,
+    )
+    train_loader = DataLoader(
+        train_set, shuffle=True, batch_size=batch_size, **loader_args
+    )
     val_loader = DataLoader(val_set, shuffle=False,
-                            drop_last=True, **loader_args)
-    unet = UNet(n_channels=3)
+                            batch_size=1, **loader_args)
+    unet = UNet(n_channels=3, learning_rate=parameters["lr"])
 
     # check if the current save path has a checkpoint, if so, load from it
     checkpoint = unet_get_checkpoint(save_path)
@@ -486,21 +509,144 @@ def run_unet():
     else:
         unet.load_vgg_weights()
 
-    unet.train_model(
-        train_loader, val_loader, save_path, max_epoch=10, current_epoch=current_epoch
+    (
+        training_loss,
+        validation_loss,
+        validation_accuracy,
+        validation_f1_score,
+    ) = unet.train_model(
+        train_loader,
+        val_loader,
+        save_path,
+        max_epoch=3,
+        current_epoch=current_epoch,
+        threshold=0.5,
     )
 
-    # in_image = np.rollaxis(train_images[0], 2)
-    # out = unet(torch.from_numpy(in_image.astype(np.float32) / 255.0))
+    # free the CUDA memory
+    print(torch.cuda.memory_summary())
+    free_gpu_memory(unet)
+    free_gpu_memory(train_loader)
+    free_gpu_memory(val_loader)
+    print(torch.cuda.memory_summary())
+
+    # prints currently alive Tensors and Variables
+    for obj in gc.get_objects():
+        try:
+            if torch.is_tensor(obj) or (hasattr(obj, 'data') and torch.is_tensor(obj.data)):
+                print(type(obj), obj.size())
+        except:
+            pass
+
+    return training_loss, validation_loss, validation_accuracy, validation_f1_score
+
+    # prediction = unet.predict(train_set[0][0])
+    # fig, ax = plt.subplots(rows=2, cols=2, figsize=(10, 5))
+    # ax = ax.ravel()
+    # ax[0].imshow(prediction, cmap="gray")
+    # ax[1].imshow(train_set[0][1], cmap="gray")
+    # fig.savefig(f"{save_path}/sample_imge.png")
 
 
 if __name__ == "__main__":
-    run_gmm()
-    # run_unet()
+    # run_gmm()
+
+    # UNet ------------------------------------------
+    # read the images
+    images, masks = read_data()
+    images = images.astype(np.float32) / 255.0
+
+    train_set, val_set, test_set = split_dataset(images, masks)
+
+    # hyperparameter lists
+    learning_rates = [1e-3, 1e-4]
+    batch_sizes = [1, 8, 16]
+    augmentation_sizes = [0, 5, 10]
+    # thresholds = [0.5, 0.75, 0.8, 0.9]
+
+    # best params
+    # (epoch, value)
+    best_validation_accuracy = (0, -float("inf"))
+    best_accuracy_params = None
+    best_validation_f1score = (0, -float("inf"))
+    best_f1score_params = None
+
+    # do grid search
+    for lr in learning_rates:
+        # graph a plot per configuration
+        fig, ax = plt.subplots(
+            nrows=len(augmentation_sizes), ncols=len(batch_sizes), figsize=(20, 20)
+        )
+        fig.suptitle(
+            f"Plots for a learning rate of {lr}\n(Batch Size changes per row; Augmentation Size changes per column)"
+        )
+
+        for j, aug_size in enumerate(augmentation_sizes):
+            train_set = augmentation_wrapper(train_set, n=aug_size)
+            val_set = augmentation_wrapper(val_set, n=0)
+            test_set = augmentation_wrapper(test_set, n=0)
+            print(f"Loaded data for augmentation size {aug_size}", flush=True)
+
+            for i, bs in enumerate(batch_sizes):
+                # store the parameters
+                params = {"lr": lr, "batch_size": bs,
+                          "augmentation_size": aug_size}
+
+                print(f"\nTraining with {params}")
+
+                # define the save location and create the folders as required
+                save_path = f"./models/unet/test_params_1/{lr}_{bs}_{aug_size}"
+                os.makedirs(save_path, exist_ok=True)
+
+                # test this configuration
+                (
+                    training_loss,
+                    validation_loss,
+                    validation_accuracy,
+                    validation_f1_score,
+                ) = run_unet(
+                    save_path,
+                    deepcopy(train_set),
+                    deepcopy(val_set),
+                    deepcopy(test_set),
+                    params,
+                )
+
+                # record the best params
+                for k in range(len(validation_accuracy)):
+                    if validation_accuracy[k] > best_validation_accuracy[1]:
+                        best_validation_accuracy = (k, validation_accuracy[k])
+                        best_accuracy_params = params
+
+                    if validation_f1_score[k] > best_validation_f1score[1]:
+                        best_validation_f1score = (k, validation_f1_score[k])
+                        best_f1score_params = params
+
+                # plot
+                ax[i, j].set_title(
+                    f"Batch size = {bs}; Augmentation_size = {aug_size}")
+                ax[i, j].set_xlabel("# Epochs")
+                ax[i, j].plot(training_loss, label="Training Loss")
+                ax[i, j].plot(validation_loss, label="Validation Loss")
+                ax[i, j].plot(validation_accuracy, label="Validation Accuracy")
+                ax[i, j].plot(validation_f1_score, label="Validation F1 Score")
+
+        # save the figure
+        fig.legend(loc="best")
+        fig.savefig(f"hyperparameter_tuning_lr_{lr}.png", format="png")
+
+    print("The best parameters are:")
+    print(
+        f"Validation Accuracy {best_validation_accuracy[1]} with params {best_accuracy_params} after Epoch {best_validation_accuracy[0]}"
+    )
+    print(
+        f"Validation F1 Score {best_validation_f1score[1]} with params {best_f1score_params} after Epoch {best_validation_f1score[0]}"
+    )
 
 """
 UNet hyperparameters to tune:
 - learning rate
 - batch size
 - amount of augmentation
+- threshold
 """
