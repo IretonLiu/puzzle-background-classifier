@@ -130,11 +130,11 @@ class UNet(nn.Module):
         self.down1 = Down(64, 128)
         self.down2 = Down(128, 256)
         self.down3 = Down(256, 512)
-        self.down4 = Down(512, 1024)
+        # self.down4 = Down(512, 1024)
 
         # Expansive path
         # the number in the name of the layer matches to the down units for the concat of the feature map
-        self.up4 = Up(1024, 512)
+        # self.up4 = Up(1024, 512)
         self.up3 = Up(512, 256)
         self.up2 = Up(256, 128)
         self.up1 = Up(128, 64)
@@ -199,7 +199,9 @@ class UNet(nn.Module):
                     pred_masks = pred_masks.to("cpu")
                     true_masks = true_masks.to("cpu")
                     for pred, true in zip(pred_masks, true_masks):
-                        confusion_matrices += confusion_matrix(pred.flatten(), true.flatten(), threshold)
+                        confusion_matrices += confusion_matrix(
+                            pred.flatten(), true.flatten(), threshold
+                        )
 
         self.train()
         return val_loss, confusion_matrices / np.sum(confusion_matrices)
@@ -213,9 +215,21 @@ class UNet(nn.Module):
         current_epoch=0,
         threshold=0.5,
     ):
+        # put the model in training mode
         self.train()
+
+        # store these values for plotting
+        training_loss = []
+        validation_loss = []
+        validation_accuracy = []
+        validation_f1_score = []
+
         for i in range(current_epoch, max_epoch):
             print("Starting epoch {}".format(i))
+            # if i == epochs_to_unfreeze:
+            #     print("Unfreezing VGG layers")
+            #     self.unfreeze_vgg_layers()
+
             epoch_loss = 0
             # https://github.com/milesial/Pytorch-UNet/blob/master/train.py
             with tqdm(
@@ -234,8 +248,13 @@ class UNet(nn.Module):
                     images = images.to(device=device, dtype=torch.float32)
                     true_masks = true_masks.to(device=device, dtype=torch.float32)
 
+                    # clear the gradients
+                    self.optimiser.zero_grad()
+
+                    # do a pass through the network
                     pred_masks = self(images)
 
+                    # crop the masks to the size of the predictions so that we can do piece-wise comparison
                     vert_dim = 2
                     hori_dim = 3
                     dim0_size_diff = (
@@ -255,10 +274,13 @@ class UNet(nn.Module):
                             pred_masks.size()[hori_dim],  # width of the cropped area
                         )
 
+                    # calculate the loss
                     loss = F.mse_loss(pred_masks, true_masks)
 
-                    self.optimiser.zero_grad()
+                    # credit assignment
                     loss.backward()
+
+                    # update weights
                     self.optimiser.step()
 
                     pbar.update(images.shape[0])
@@ -271,12 +293,34 @@ class UNet(nn.Module):
             path = f"{save_path}/epoch_{i}.pt"
             self.save_model(path, i)
             val_loss, matrix = self.evaluate(val_data_loader, threshold)
+
+            # save values
+            training_loss.append(epoch_loss)
+            validation_loss.append(val_loss)
+            validation_accuracy.append(accuracy(matrix))
+            validation_f1_score.append(f1_score(matrix))
+
             print(f"Epoch {i}:")
-            print(f"\ttraining loss = {epoch_loss}")
-            print(f"\tvalidation loss = {val_loss}")
-            print(f"\tvalidation accuracy = {accuracy(matrix)}")
-            print(f"\tvalidation F1 Score = {f1_score(matrix)}")
+            print(f"\ttraining loss = {training_loss[-1]}")
+            print(f"\tvalidation loss = {validation_loss[-1]}")
+            print(f"\tvalidation accuracy = {validation_accuracy[-1]}")
+            print(f"\tvalidation F1 Score = {validation_f1_score[-1]}")
             print("", end="", flush=True)
+        
+        return training_loss, validation_loss, validation_accuracy, validation_f1_score
+
+    def predict(self, image, threshold=0.5):
+        # predict the output image
+        self.eval()
+
+        with torch.no_grad():
+            image = image.to(device=device, dtype=torch.float32)
+
+            pred_mask = self(image)
+
+            pred_mask = pred_mask.to("cpu")
+
+        return pred_mask.detach().numpy()
 
     def forward(self, x):
         # pass the image through the unet
@@ -303,6 +347,12 @@ class UNet(nn.Module):
 
         # sigmoid activation to map to (0, 1) -> use 0.5 as a threshold
         return torch.sigmoid(x)
+
+    # def unfreeze_vgg_layers(self):
+    #     layers_to_unfreeze = [self.initial, self.down1, self.down2, self.down3]
+    #     for layer in layers_to_unfreeze:
+    #         for i, param in enumerate(layer.parameters()):
+    #             param.requires_grad_(True)
 
     def load_vgg_weights(self):
         # load the pretrained weights for the relevant layers
@@ -343,6 +393,11 @@ class UNet(nn.Module):
         self.down1.load_conv_weights(vgg, 5, 7)
         self.down2.load_conv_weights(vgg, 10, 12)
         self.down3.load_conv_weights(vgg, 17, 19)
+
+        # layers_to_freeze = [self.initial, self.down1, self.down2, self.down3]
+        # for layer in layers_to_freeze:
+        #     for i, param in enumerate(layer.parameters()):
+        #         param.requires_grad_(False)
 
         print("Finished loading")
 

@@ -4,9 +4,11 @@ import time
 import os
 import glob
 from natsort import natsorted
+from tqdm import tqdm
+from copy import deepcopy
 
 # from matplotlib.pyplot import scatter
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 import numpy as np
 from sklearn import cluster
 from sklearn.metrics import accuracy_score
@@ -74,24 +76,28 @@ def augment_images(images, masks, n=10):
 
     augmented_images = []
     augmented_masks = []
-    for image_tensor, mask_tensor in zip(image_tensors, mask_tensors):
+    with tqdm(total=len(images) * n, desc=f"Transforming Images", unit="img") as pbar:
+        for image_tensor, mask_tensor in zip(image_tensors, mask_tensors):
 
-        for i in range(n):
-            # get the affine transformation parameters
-            params = T.RandomAffine.get_params(
-                degrees=(-180, 180),
-                translate=(0.3, 0.3),
-                scale_ranges=None,
-                shears=None,
-                img_size=image_tensor.size(),
-            )
+            for i in range(n):
+                # get the affine transformation parameters
+                params = T.RandomAffine.get_params(
+                    degrees=(-180, 180),
+                    translate=(0.3, 0.3),
+                    scale_ranges=None,
+                    shears=None,
+                    img_size=image_tensor.size(),
+                )
 
-            # apply the affine transformation
-            aug_image = T.functional.affine(image_tensor, *params)
-            aug_mask = T.functional.affine(mask_tensor, *params)
+                # apply the affine transformation
+                aug_image = T.functional.affine(image_tensor, *params)
+                aug_mask = T.functional.affine(mask_tensor, *params)
 
-            augmented_images.append(aug_image)
-            augmented_masks.append(aug_mask)
+                augmented_images.append(aug_image)
+                augmented_masks.append(aug_mask)
+
+                pbar.update()
+                print("", end="", flush=True)
 
     # add the original images
     augmented_images = torch.cat((image_tensors, torch.stack(augmented_images)), dim=0)
@@ -324,26 +330,24 @@ def augmentation_wrapper(data, n):
     return output
 
 
-def run_unet():
-    # define the save location and create the folders as required
-    save_path = "./models/unet/test"
-    os.makedirs(save_path, exist_ok=True)
-
-    images, masks = read_data()
-    images = images.astype(np.float32) / 255.0
-
-    train_set, val_set, test_set = split_dataset(images, masks)
-    train_set = augmentation_wrapper(train_set, n=2)
+def run_unet(save_path, train_set, val_set, test_set, parameters):
+    train_set = augmentation_wrapper(train_set, n=parameters["augmentation_size"])
     val_set = augmentation_wrapper(val_set, n=0)
     test_set = augmentation_wrapper(test_set, n=0)
     print("Loaded data", flush=True)
 
-    batch_size = 1
+    batch_size = parameters["batch_size"]
 
-    loader_args = dict(batch_size=batch_size, num_workers=4, pin_memory=True)
-    train_loader = DataLoader(train_set, shuffle=True, **loader_args)
-    val_loader = DataLoader(val_set, shuffle=False, drop_last=True, **loader_args)
-    unet = UNet(n_channels=3)
+    loader_args = dict(
+        num_workers=4,
+        pin_memory=True,
+        drop_last=True,
+    )
+    train_loader = DataLoader(
+        train_set, shuffle=True, batch_size=batch_size, **loader_args
+    )
+    val_loader = DataLoader(val_set, shuffle=False, batch_size=1, **loader_args)
+    unet = UNet(n_channels=3, learning_rate=parameters["lr"])
 
     # check if the current save path has a checkpoint, if so, load from it
     checkpoint = unet_get_checkpoint(save_path)
@@ -353,21 +357,111 @@ def run_unet():
     else:
         unet.load_vgg_weights()
 
-    unet.train_model(
-        train_loader, val_loader, save_path, max_epoch=10, current_epoch=current_epoch
+    (
+        training_loss,
+        validation_loss,
+        validation_accuracy,
+        validation_f1_score,
+    ) = unet.train_model(
+        train_loader,
+        val_loader,
+        save_path,
+        max_epoch=15,
+        current_epoch=current_epoch,
+        threshold=0.5,
     )
 
-    # in_image = np.rollaxis(train_images[0], 2)
-    # out = unet(torch.from_numpy(in_image.astype(np.float32) / 255.0))
+    return training_loss, validation_loss, validation_accuracy, validation_f1_score
+
+    # prediction = unet.predict(train_set[0][0])
+    # fig, ax = plt.subplots(rows=2, cols=2, figsize=(10, 5))
+    # ax = ax.ravel()
+    # ax[0].imshow(prediction, cmap="gray")
+    # ax[1].imshow(train_set[0][1], cmap="gray")
+    # fig.savefig(f"{save_path}/sample_imge.png")
 
 
 if __name__ == "__main__":
     # run_gmm()
-    run_unet()
+    # run_unet("./models/unet/one", {"lr": 1e-3, "batch_size": 1, "augmentation_size": 0})
+    # exit()
+
+    # UNet ------------------------------------------
+    # read the images
+    images, masks = read_data()
+    images = images.astype(np.float32) / 255.0
+
+    train_set, val_set, test_set = split_dataset(images, masks)
+
+    # hyperparameter lists
+    learning_rates = [1e-3, 1e-4]
+    batch_sizes = [1, 8, 16]
+    augmentation_sizes = [0, 5, 10]
+    # thresholds = [0.5, 0.75, 0.8, 0.9]
+
+    # best params
+    best_validation_accuracy = -float("inf")
+    best_accuracy_params = None
+    best_validation_f1score = -float("inf")
+    best_f1score_params = None
+
+    # do grid search
+    for lr in learning_rates:
+        # graph a plot per configuration
+        fig, ax = plt.subplots(
+            nrows=len(augmentation_sizes), ncols=len(batch_sizes), figsize=(20, 20)
+        )
+        fig.suptitle(f"Plots for a learning rate of {lr}\n(Batch Size changes per row; Augmentation Size changes per column)")
+
+        for i, bs in enumerate(batch_sizes):
+            for j, aug_size in enumerate(augmentation_sizes):
+                # store the parameters
+                params = {"lr": lr, "batch_size": bs, "augmentation_size": aug_size}
+
+                # define the save location and create the folders as required
+                save_path = f"./models/unet/params/{lr}_{bs}_{aug_size}"
+                os.makedirs(save_path, exist_ok=True)
+
+                # test this configuration
+                (
+                    training_loss,
+                    validation_loss,
+                    validation_accuracy,
+                    validation_f1_score,
+                ) = run_unet(save_path, deepcopy(train_set), deepcopy(val_set), deepcopy(test_set), params)
+
+                # record the best params
+                if validation_accuracy > best_validation_accuracy:
+                    best_validation_accuracy = validation_accuracy
+                    best_accuracy_params = params
+
+                if validation_f1_score > best_validation_f1score:
+                    best_validation_f1score = validation_f1_score
+                    best_f1score_params = params
+
+                # plot
+                ax[i, j].set_title(f"Batch size = {bs}; Augmentation_size = {aug_size}")
+                ax[i, j].plot(training_loss, label="Training Loss")
+                ax[i, j].plot(validation_loss, label="Validation Loss")
+                ax[i, j].plot(validation_accuracy, label="Validation Accuracy")
+                ax[i, j].plot(validation_f1_score, label="Validation F1 Score")
+
+        # save the figure
+        fig.legend(loc="best")
+        fig.savefig(f"hyperparameter_tuning_lr_{lr}.png", format="png")
+
+    print("The best parameters are:")
+    print(
+        f"Validation Accuracy {best_validation_accuracy} with params {best_accuracy_params}"
+    )
+    print(
+        f"Validation F1 Score {best_validation_f1score} with params {best_f1score_params}"
+    )
 
 """
 UNet hyperparameters to tune:
 - learning rate
 - batch size
 - amount of augmentation
+- threshold
 """
