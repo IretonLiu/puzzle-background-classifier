@@ -5,7 +5,7 @@ from torchvision.models import vgg16, VGG16_Weights
 import torch
 from tqdm import tqdm
 import numpy as np
-from utils import confusion_matrix, accuracy, f1_score, free_gpu_memory
+from utils import confusion_matrix, accuracy, f1_score
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -203,9 +203,9 @@ class UNet(nn.Module):
                             pred.flatten(), true.flatten(), threshold
                         )
 
-                    free_gpu_memory(pred_masks)
-                    free_gpu_memory(true_masks)
-                    free_gpu_memory(images)
+                    # free_gpu_memory(pred_masks)
+                    # free_gpu_memory(true_masks)
+                    # free_gpu_memory(images)
 
         self.train()
         return val_loss, confusion_matrices / np.sum(confusion_matrices)
@@ -237,7 +237,9 @@ class UNet(nn.Module):
             epoch_loss = 0
             # https://github.com/milesial/Pytorch-UNet/blob/master/train.py
             with tqdm(
-                total=len(train_data_loader), desc=f"Epoch {i}/{max_epoch-1}", unit="img"
+                total=len(train_data_loader),
+                desc=f"Epoch {i}/{max_epoch-1}",
+                unit="img",
             ) as pbar:
                 for batch in train_data_loader:
                     images = batch[0]
@@ -293,9 +295,9 @@ class UNet(nn.Module):
 
                     print("", end="", flush=True)
 
-                    free_gpu_memory(pred_masks)
-                    free_gpu_memory(true_masks)
-                    free_gpu_memory(images)
+                    # free_gpu_memory(pred_masks)
+                    # free_gpu_memory(true_masks)
+                    # free_gpu_memory(images)
 
             # save model and to evaluation on validation data
             path = f"{save_path}/epoch_{i}.pt"
@@ -314,7 +316,7 @@ class UNet(nn.Module):
             print(f"\tvalidation accuracy = {validation_accuracy[-1]}")
             print(f"\tvalidation F1 Score = {validation_f1_score[-1]}")
             print("", end="", flush=True)
-        
+
         return training_loss, validation_loss, validation_accuracy, validation_f1_score
 
     def predict(self, image, threshold=0.5):

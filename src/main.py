@@ -28,7 +28,6 @@ from utils import (
     precision,
     recall,
     f1_score,
-    free_gpu_memory,
 )
 
 res = (1024, 768)
@@ -466,13 +465,14 @@ def augmentation_wrapper(data, n):
 
     return output
 
+
 def run_unet(save_path, train_set, val_set, test_set, parameters):
     # train_set = augmentation_wrapper(train_set, n=parameters["augmentation_size"])
     # val_set = augmentation_wrapper(val_set, n=0)
     # test_set = augmentation_wrapper(test_set, n=0)
     # print("Loaded data", flush=True)
-    
-    batch_size = parameters["batch_size"]
+
+    batch_size = 1
 
     loader_args = dict(
         num_workers=4,
@@ -483,6 +483,7 @@ def run_unet(save_path, train_set, val_set, test_set, parameters):
         train_set, shuffle=True, batch_size=batch_size, **loader_args
     )
     val_loader = DataLoader(val_set, shuffle=False, batch_size=1, **loader_args)
+
     unet = UNet(n_channels=3, learning_rate=parameters["lr"])
 
     # check if the current save path has a checkpoint, if so, load from it
@@ -507,21 +508,6 @@ def run_unet(save_path, train_set, val_set, test_set, parameters):
         threshold=0.5,
     )
 
-    # free the CUDA memory
-    print(torch.cuda.memory_summary())
-    free_gpu_memory(unet)
-    free_gpu_memory(train_loader)
-    free_gpu_memory(val_loader)
-    print(torch.cuda.memory_summary())
-
-    # prints currently alive Tensors and Variables
-    for obj in gc.get_objects():
-        try:
-            if torch.is_tensor(obj) or (hasattr(obj, 'data') and torch.is_tensor(obj.data)):
-                print(type(obj), obj.size())
-        except:
-            pass
-
     return training_loss, validation_loss, validation_accuracy, validation_f1_score
 
     # prediction = unet.predict(train_set[0][0])
@@ -536,15 +522,15 @@ if __name__ == "__main__":
     # run_gmm()
 
     # UNet ------------------------------------------
+    run_name = "test"
     # read the images
     images, masks = read_data()
     images = images.astype(np.float32) / 255.0
 
-    train_set, val_set, test_set = split_dataset(images, masks)
+    train_set_, val_set_, test_set_ = split_dataset(images, masks)
 
     # hyperparameter lists
-    learning_rates = [1e-3, 1e-4]
-    batch_sizes = [1, 8, 16]
+    learning_rates = [1e-3, 5e-4, 1e-4]
     augmentation_sizes = [0, 5, 10]
     # thresholds = [0.5, 0.75, 0.8, 0.9]
 
@@ -555,67 +541,66 @@ if __name__ == "__main__":
     best_validation_f1score = (0, -float("inf"))
     best_f1score_params = None
 
+    # graph a plot per configuration
+    fig, ax = plt.subplots(
+        nrows=len(augmentation_sizes), ncols=len(learning_rates), figsize=(20, 20)
+    )
+    fig.suptitle(
+        f"Plots of training and validation performance\n(Augmentation Size changes per row; Learning Rate changes per column)"
+    )
+
     # do grid search
-    for lr in learning_rates:
-        # graph a plot per configuration
-        fig, ax = plt.subplots(
-            nrows=len(augmentation_sizes), ncols=len(batch_sizes), figsize=(20, 20)
-        )
-        fig.suptitle(
-            f"Plots for a learning rate of {lr}\n(Batch Size changes per row; Augmentation Size changes per column)"
-        )
+    for i, aug_size in enumerate(augmentation_sizes):
+        train_set = augmentation_wrapper(train_set_, n=aug_size)
+        val_set = augmentation_wrapper(val_set_, n=0)
+        test_set = augmentation_wrapper(test_set_, n=0)
+        print(f"Loaded data for augmentation size {aug_size}", flush=True)
 
-        for j, aug_size in enumerate(augmentation_sizes):
-            train_set = augmentation_wrapper(train_set, n=aug_size)
-            val_set = augmentation_wrapper(val_set, n=0)
-            test_set = augmentation_wrapper(test_set, n=0)
-            print(f"Loaded data for augmentation size {aug_size}", flush=True)
+        for j, lr in enumerate(learning_rates):
+            # store the parameters
+            params = {"lr": lr, "augmentation_size": aug_size}
 
-            for i, bs in enumerate(batch_sizes):
-                # store the parameters
-                params = {"lr": lr, "batch_size": bs, "augmentation_size": aug_size}
+            print(f"\nTraining with {params}")
 
-                print(f"\nTraining with {params}")
+            # define the save location and create the folders as required
+            save_path = f"./models/unet/{run_name}/{lr}_{aug_size}"
+            os.makedirs(save_path, exist_ok=True)
 
-                # define the save location and create the folders as required
-                save_path = f"./models/unet/test_params_1/{lr}_{bs}_{aug_size}"
-                os.makedirs(save_path, exist_ok=True)
+            # test this configuration
+            (
+                training_loss,
+                validation_loss,
+                validation_accuracy,
+                validation_f1_score,
+            ) = run_unet(
+                save_path,
+                deepcopy(train_set),
+                deepcopy(val_set),
+                deepcopy(test_set),
+                params,
+            )
 
-                # test this configuration
-                (
-                    training_loss,
-                    validation_loss,
-                    validation_accuracy,
-                    validation_f1_score,
-                ) = run_unet(
-                    save_path,
-                    deepcopy(train_set),
-                    deepcopy(val_set),
-                    deepcopy(test_set),
-                    params,
-                )
+            # record the best params
+            for k in range(len(validation_accuracy)):
+                if validation_accuracy[k] > best_validation_accuracy[1]:
+                    best_validation_accuracy = (k, validation_accuracy[k])
+                    best_accuracy_params = params
 
-                # record the best params
-                for k in range(len(validation_accuracy)):
-                    if validation_accuracy[k] > best_validation_accuracy[1]:
-                        best_validation_accuracy = (k, validation_accuracy[k])
-                        best_accuracy_params = params
+                if validation_f1_score[k] > best_validation_f1score[1]:
+                    best_validation_f1score = (k, validation_f1_score[k])
+                    best_f1score_params = params
 
-                    if validation_f1_score[k] > best_validation_f1score[1]:
-                        best_validation_f1score = (k, validation_f1_score[k])
-                        best_f1score_params = params
+            # plot
+            ax[i, j].set_title(f"Augmentation_size = {aug_size}; Learning Rate = {lr}")
+            ax[i, j].set_xlabel("# Epochs")
+            ax[i, j].plot(training_loss, label="Training Loss")
+            ax[i, j].plot(validation_loss, label="Validation Loss")
+            ax[i, j].plot(validation_accuracy, label="Validation Accuracy")
+            ax[i, j].plot(validation_f1_score, label="Validation F1 Score")
 
-                # plot
-                ax[i, j].set_title(f"Batch size = {bs}; Augmentation_size = {aug_size}")
-                ax[i, j].set_xlabel("# Epochs")
-                ax[i, j].plot(training_loss, label="Training Loss")
-                ax[i, j].plot(validation_loss, label="Validation Loss")
-                ax[i, j].plot(validation_accuracy, label="Validation Accuracy")
-                ax[i, j].plot(validation_f1_score, label="Validation F1 Score")
-
-        # save the figure
-        fig.legend(loc="best")
-        fig.savefig(f"hyperparameter_tuning_lr_{lr}.png", format="png")
+    # save the figure
+    fig.legend(loc="best")
+    fig.savefig(f"hyperparameter_tuning_lr_{lr}.png", format="png")
 
     print("The best parameters are:")
     print(
