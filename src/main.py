@@ -509,7 +509,7 @@ def run_unet(save_path, train_set, val_set, test_set, parameters, validate_only=
             train_loader,
             val_loader,
             save_path,
-            max_epoch=2,
+            max_epoch=15,
             current_epoch=current_epoch,
             threshold=parameters["threshold"] if "threshold" in parameters else 0.5,
         )
@@ -736,7 +736,7 @@ def do_unet_k_fold(run_name, images, masks, k, parameters):
     indices = [i for i in range(len(images))]
 
     # graph a plot for accuracy and f1 score
-    fig, ax = plt.subplot(nrows=1, ncols=2, figsize=(20, 10))
+    fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(20, 10))
     fig.suptitle(
         f"Plots of Test Accuracy and F1 Score for each of the k-splits (k = {k})"
     )
@@ -746,8 +746,9 @@ def do_unet_k_fold(run_name, images, masks, k, parameters):
     ax[1].set_xlabel("# Epochs")
 
     # keep track for the average accuracy and f1 score per epoch
-    total_accuracy = np.zeros(2, dtype=np.float32)
-    total_f1_scores = np.zeros(2, dtype=np.float32)
+    x_vals = [i for i in range(15)]
+    total_accuracy = np.zeros(15, dtype=np.float32)
+    total_f1_scores = np.zeros(15, dtype=np.float32)
 
     # now do a train and evaluation on each split
     i = 0
@@ -757,12 +758,17 @@ def do_unet_k_fold(run_name, images, masks, k, parameters):
         test_set_ = [(images[i], masks[i]) for i in test_indices]
 
         # augment the images
-        train_set = augmentation_wrapper(deepcopy(train_set_), n=parameters["augmentation_size"])
+        train_set = augmentation_wrapper(
+            deepcopy(train_set_), n=parameters["augmentation_size"]
+        )
         test_set = augmentation_wrapper(deepcopy(test_set_), n=0)
         print(
             f"Loaded data for augmentation size {parameters['augmentation_size']}",
             flush=True,
         )
+
+        fold_path = f"{save_path}/{i}"
+        os.makedirs(fold_path, exist_ok=True)
 
         # train and evaluate on this combination
         (
@@ -771,7 +777,7 @@ def do_unet_k_fold(run_name, images, masks, k, parameters):
             validation_accuracy,
             validation_f1_score,
         ) = run_unet(
-            f"{save_path}/{i}",
+            fold_path,
             train_set,
             test_set,
             None,
@@ -783,8 +789,8 @@ def do_unet_k_fold(run_name, images, masks, k, parameters):
         total_f1_scores += np.array(validation_f1_score)
 
         # plot the f1 score and accuracy
-        ax[0].plot(validation_accuracy, label="1")
-        ax[1].plot(validation_f1_score)
+        ax[0].plot(x_vals, validation_accuracy, label=i)
+        ax[1].plot(x_vals, validation_f1_score)
 
         i += 1
 
@@ -792,8 +798,8 @@ def do_unet_k_fold(run_name, images, masks, k, parameters):
     total_accuracy /= k
     total_f1_scores /= k
 
-    ax[0].plot(total_accuracy, label="average")
-    ax[1].plot(total_f1_scores)
+    ax[0].plot(x_vals, total_accuracy, label="average")
+    ax[1].plot(x_vals, total_f1_scores)
 
     # save the figure
     fig.legend()
@@ -823,5 +829,5 @@ if __name__ == "__main__":
 
     # do k-fold validation
     do_unet_k_fold(
-        "one", images, masks, 6, {"lr": 1e-4, "threshold": 0.4, "augmentation_size": 5}
+        "15", images, masks, 6, {"lr": 1e-4, "threshold": 0.4, "augmentation_size": 5}
     )
