@@ -687,21 +687,38 @@ def do_unet_threshold_tuning(run_name, train_set_, val_set_, test_set_):
             best_threshold = t
 
     # plot an ROC curve
+    font = 10
     plt.suptitle(
-        f"ROC Curve for Learning Rate = {lr} and Augmentation Size = {aug_size} (model after Epoch {epoch} used)\n(Max Accuracy of {best_acc} at threshold {best_threshold})"
+        f"ROC Curve for Learning Rate = {lr} and Augmentation Size = {aug_size}\n(Max Accuracy of {np.round(best_acc, 4)} at threshold {best_threshold})",
+        fontsize=font,
     )
-    plt.plot([0, 1], [0, 1], label="Random")
-    plt.plt(false_positive_rate_arr, recall_arr, label="Our Model")
+    plt.plot(
+        [min(false_positive_rate_arr), max(false_positive_rate_arr)],
+        [min(recall_arr), max(recall_arr)],
+        label="Random",
+    )
+    plt.plot(
+        false_positive_rate_arr, recall_arr, label=f"model after epoch {epoch} used"
+    )
+    plt.xlabel("False Positive Rate", fontsize=font)
+    plt.ylabel("True Positive rate", fontsize=font)
     plt.legend()
     plt.savefig(f"{save_path}/roc.png", format="png")
     plt.clf()
 
     # plot a precision-recall curve
     plt.suptitle(
-        f"Precision-Recall Curve for Learning Rate = {lr} and Augmentation Size = {aug_size} (model after Epoch {epoch} used)\n(Max Accuracy of {best_acc} at threshold {best_threshold})"
+        f"Precision-Recall Curve for Learning Rate = {lr} and Augmentation Size = {aug_size}\n(Max Accuracy of {np.round(best_acc, 4)} at threshold {best_threshold})",
+        fontsize=font,
     )
-    plt.plot([0, 1], [0, 1], label="Random")
-    plt.plt(recall_arr, precision_arr, label="Our Model")
+    # plt.plot(
+    #     [min(recall_arr), max(recall_arr)],
+    #     [min(precision_arr), max(precision_arr)],
+    #     label="Random",
+    # )
+    plt.plot(recall_arr, precision_arr, label=f"model after epoch {epoch} used")
+    plt.xlabel("Recall", fontsize=font)
+    plt.ylabel("Precision", fontsize=font)
     plt.legend()
     plt.savefig(f"{save_path}/precision-recall.png", format="png")
     plt.clf()
