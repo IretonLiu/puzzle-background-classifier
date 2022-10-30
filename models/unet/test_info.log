@@ -1,0 +1,5 @@
+loading model from ./models/unet/15/0.0001_5/epoch_13.pt
+model loaded from ./models/unet/15/0.0001_5/epoch_13.pt
+Validating: 100%|█████████████████████████████████████████████████████████████████████████████| 7/7 [01:21<00:00, 11.64s/img, loss (batch)=0.00163]
+Test Accuracy = 0.9969087737947098
+Test F1 Score = 0.9947025678149423

@@ -20,6 +20,7 @@ from classifier import Classifier
 from unet import UNet
 
 import torch
+from torchvision.transforms.functional import crop
 from torch.utils.data import DataLoader, random_split
 from torchvision import transforms as T
 
@@ -522,13 +523,6 @@ def run_unet(save_path, train_set, val_set, test_set, parameters, validate_only=
 
         return matrix
 
-    # prediction = unet.predict(train_set[0][0])
-    # fig, ax = plt.subplots(rows=2, cols=2, figsize=(10, 5))
-    # ax = ax.ravel()
-    # ax[0].imshow(prediction, cmap="gray")
-    # ax[1].imshow(train_set[0][1], cmap="gray")
-    # fig.savefig(f"{save_path}/sample_imge.png")
-
 
 def do_unet_hyperparameter_search(run_name, train_set_, val_set_, test_set_):
     # hyperparameter lists
@@ -814,12 +808,87 @@ def do_unet_k_fold(run_name, images, masks, k, parameters):
     )
 
 
+def do_unet_test(model_path, train_set_, test_set_, parameters):
+    # filepath is the complete file path to the model to use for testing and prediction
+
+    train_set = augmentation_wrapper(train_set_, n=0)
+    test_set = augmentation_wrapper(test_set_, n=0)
+
+    # get the confusion matrix
+    matrix = run_unet(model_path, train_set, deepcopy(test_set), None, parameters, True)
+
+    # print some stats
+    print(f"Test Accuracy = {accuracy(matrix)}")
+    print(f"Test F1 Score = {f1_score(matrix)}")
+
+
+def do_unet_prediction(model_path, plot_save_name, image, mask, parameters):
+    # image and mask should already have been augmented
+
+    # create the model
+    unet = UNet(n_channels=3, learning_rate=parameters["lr"])
+
+    # load from some checkpoint
+    checkpoint = unet_get_checkpoint(
+        model_path, parameters["epoch"] if "epoch" in parameters else -1
+    )
+    if checkpoint:
+        unet.load_model(checkpoint)
+    else:
+        unet.load_vgg_weights()
+
+    # evaluate the model
+    prediction = unet.predict(image, parameters["threshold"])
+
+    # crop the true masks
+    mask = mask.squeeze()
+    vert_dim = 0
+    hori_dim = 1
+    dim0_size_diff = mask.size()[vert_dim] - prediction.size()[vert_dim]
+    dim1_size_diff = mask.size()[hori_dim] - prediction.size()[hori_dim]
+
+    if dim0_size_diff != 0 and dim1_size_diff != 0:
+        mask = crop(
+            mask,
+            dim0_size_diff // 2,  # top left vertical component
+            dim1_size_diff // 2,  # top left horizontal component
+            prediction.size()[vert_dim],  # height of the cropped area
+            prediction.size()[hori_dim],  # width of the cropped area
+        )
+
+    # plot
+    fig, ax = plt.subplots(nrows=1, ncols=4, figsize=(20, 5))
+
+    acc = accuracy(
+        confusion_matrix(prediction.flatten(), mask.flatten(), parameters["threshold"])
+    )
+    fig.suptitle(f"Segmentation Accuracy = {np.round(acc, 4)}")
+
+    ax[0].set_title("Image")
+    ax[0].imshow(image.permute(1, 2, 0).numpy())
+    ax[1].set_title("Predicted Mask")
+    ax[1].imshow(prediction.numpy(), cmap="gray")
+    ax[2].set_title("True Mask")
+    ax[2].imshow(mask.numpy(), cmap="gray")
+    ax[3].set_title("Difference")
+    ax[3].imshow(
+        mask.numpy().astype(np.uint8) - prediction.numpy().astype(np.uint8), cmap="gray"
+    )
+
+    for a in ax:
+        a.axis("off")
+
+    fig.savefig(plot_save_name, bbox_inches="tight", format="png")
+
+
 if __name__ == "__main__":
     # read in the data for unet
+    # --------------------------- DO NOT TOUCH ---------------------------
     images, masks = read_data()
     images = images.astype(np.float32) / 255.0
 
     train_set_, val_set_, test_set_ = split_dataset(images, masks)
+    # --------------------------- DO NOT TOUCH ---------------------------
 
     # hyperparameter search
     # do_unet_hyperparameter_search("15", train_set_, val_set_, test_set_)
@@ -828,6 +897,34 @@ if __name__ == "__main__":
     # do_unet_threshold_tuning("15_thresholds", train_set_, val_set_, test_set_)
 
     # do k-fold validation
-    do_unet_k_fold(
-        "15", images, masks, 6, {"lr": 1e-4, "threshold": 0.4, "augmentation_size": 5}
-    )
+    # do_unet_k_fold(
+    #     "15", images, masks, 6, {"lr": 1e-4, "threshold": 0.4, "augmentation_size": 5}
+    # )
+
+    # evaluate on the test set
+    # do_unet_test(
+    #     "./models/unet/15/0.0001_5",
+    #     train_set_,
+    #     test_set_,
+    #     {"lr": 1e-4, "threshold": 0.4, "augmentation_size": 5, "epoch": 13},
+    # )
+
+    # do prediction on some images
+    test_set = augmentation_wrapper(test_set_, n=0)
+    image_save_path = "./models/unet/images"
+    os.makedirs(image_save_path, exist_ok=True)
+    images_to_examine = [0, 1, 2, 3, 4]
+    for i in images_to_examine:
+        if i < 0 or i >= len(test_set):
+            print(f"Image {i} does not exist. Skipping...")
+            continue
+        else:
+            print(f"Processing Image {i}")
+
+        do_unet_prediction(
+            "./models/unet/15/0.0001_5",
+            f"{image_save_path}/{i}.png",
+            test_set[i][0],
+            test_set[i][1],
+            {"lr": 1e-4, "threshold": 0.4, "augmentation_size": 5, "epoch": 13},
+        )
