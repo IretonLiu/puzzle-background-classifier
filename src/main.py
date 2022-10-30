@@ -509,9 +509,9 @@ def run_unet(save_path, train_set, val_set, test_set, parameters, validate_only=
             train_loader,
             val_loader,
             save_path,
-            max_epoch=15,
+            max_epoch=2,
             current_epoch=current_epoch,
-            threshold=0.5,
+            threshold=parameters["threshold"] if "threshold" in parameters else 0.5,
         )
 
         return training_loss, validation_loss, validation_accuracy, validation_f1_score
@@ -707,11 +707,88 @@ def do_unet_threshold_tuning(run_name, train_set_, val_set_, test_set_):
     plt.clf()
 
 
-# def do_unet_k_fold(run_name, images, masks, k=6):
-#     # create a KFold model selection object
-#     kfold = KFold(k)
+def do_unet_k_fold(run_name, images, masks, k, parameters):
+    # determine where to save
+    save_path = f"./models/unet/kfold/{run_name}"
+    os.makedirs(save_path, exist_ok=True)
 
-#     # create a list of indices
+    # create a KFold model selection object
+    kfold = KFold(k)
+
+    # create a list of indices
+    indices = [i for i in range(len(images))]
+
+    # graph a plot for accuracy and f1 score
+    fig, ax = plt.subplot(nrows=1, ncols=2, figsize=(20, 10))
+    fig.suptitle(
+        f"Plots of Test Accuracy and F1 Score for each of the k-splits (k = {k})"
+    )
+    ax[0].set_title("Test Accuracy")
+    ax[1].set_title("Test F1 Score")
+    ax[0].set_xlabel("# Epochs")
+    ax[1].set_xlabel("# Epochs")
+
+    # keep track for the average accuracy and f1 score per epoch
+    total_accuracy = np.zeros(2, dtype=np.float32)
+    total_f1_scores = np.zeros(2, dtype=np.float32)
+
+    # now do a train and evaluation on each split
+    i = 0
+    for train_indices, test_indices in kfold.split(indices):
+        # use the indices to construct data sets
+        train_set_ = [(images[i], masks[i]) for i in train_indices]
+        test_set_ = [(images[i], masks[i]) for i in test_indices]
+
+        # augment the images
+        train_set = augmentation_wrapper(deepcopy(train_set_), n=parameters["augmentation_size"])
+        test_set = augmentation_wrapper(deepcopy(test_set_), n=0)
+        print(
+            f"Loaded data for augmentation size {parameters['augmentation_size']}",
+            flush=True,
+        )
+
+        # train and evaluate on this combination
+        (
+            training_loss,
+            validation_loss,
+            validation_accuracy,
+            validation_f1_score,
+        ) = run_unet(
+            f"{save_path}/{i}",
+            train_set,
+            test_set,
+            None,
+            parameters,
+        )
+
+        # track the avg and f1 scores
+        total_accuracy += np.array(validation_accuracy)
+        total_f1_scores += np.array(validation_f1_score)
+
+        # plot the f1 score and accuracy
+        ax[0].plot(validation_accuracy, label="1")
+        ax[1].plot(validation_f1_score)
+
+        i += 1
+
+    # average the accuracy and f1 scores
+    total_accuracy /= k
+    total_f1_scores /= k
+
+    ax[0].plot(total_accuracy, label="average")
+    ax[1].plot(total_f1_scores)
+
+    # save the figure
+    fig.legend()
+    fig.savefig(f"{save_path}/kfold.png", format="png")
+
+    print("The best average performance is:")
+    print(
+        f"Accuracy = {np.max(total_accuracy)} after Epoch {np.argmax(total_accuracy)}"
+    )
+    print(
+        f"F1 Score = {np.max(total_f1_scores)} after Epoch {np.argmax(total_f1_scores)}"
+    )
 
 
 if __name__ == "__main__":
@@ -725,4 +802,9 @@ if __name__ == "__main__":
     # do_unet_hyperparameter_search("15", train_set_, val_set_, test_set_)
 
     # do the threshold tuning
-    do_unet_threshold_tuning("15_thresholds", train_set_, val_set_, test_set_)
+    # do_unet_threshold_tuning("15_thresholds", train_set_, val_set_, test_set_)
+
+    # do k-fold validation
+    do_unet_k_fold(
+        "one", images, masks, 6, {"lr": 1e-4, "threshold": 0.4, "augmentation_size": 5}
+    )
