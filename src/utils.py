@@ -5,6 +5,13 @@ import gc
 import torch
 
 
+# def free_gpu_memory(data):
+#     del data
+#     data = None
+#     gc.collect()
+#     torch.cuda.empty_cache()
+
+
 def confusion_matrix(predicted_mask, true_mask, threshold=0.5):
     # count the number of pixels that were correctly classified
     # true mask is binary
@@ -29,6 +36,11 @@ def precision(confusion_matrix):
 def recall(confusion_matrix):
     # TP / (TP + FN)
     return confusion_matrix[1, 1] / (confusion_matrix[1, 1] + confusion_matrix[1, 0])
+
+
+def false_positive_rate(confusion_matrix):
+    # FP / (FP + TN)
+    return confusion_matrix[0, 1] / (confusion_matrix[0, 1] + confusion_matrix[0, 0])
 
 
 def f1_score(confusion_matrix):

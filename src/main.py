@@ -9,7 +9,7 @@ from tqdm import tqdm
 from copy import deepcopy
 
 # from matplotlib.pyplot import scatter
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 import numpy as np
 from gmm import GaussianMixtureModel
 from scipy.stats import multivariate_normal
@@ -20,16 +20,17 @@ from classifier import Classifier
 from unet import UNet
 
 import torch
+from torchvision.transforms.functional import crop
 from torch.utils.data import DataLoader, random_split
 from torchvision import transforms as T
 
 from utils import (
     confusion_matrix,
     accuracy,
+    false_positive_rate,
     precision,
     recall,
     f1_score,
-
 )
 
 res = (1024, 768)
@@ -497,13 +498,14 @@ def run_gmm():
                          best_foreground_h, best_background_h)
 
 
-def unet_get_checkpoint(path):
+def unet_get_checkpoint(path, number):
+    # number is the epoch to load
     # get the name of the latest model
     dirs = glob.glob(f"{path}/*.pt")
     if len(dirs) == 0:
         return None
 
-    return natsorted(dirs)[-1]
+    return natsorted(dirs)[number]
 
 
 def augmentation_wrapper(data, n):
@@ -528,13 +530,13 @@ def augmentation_wrapper(data, n):
     return output
 
 
-def run_unet(save_path, train_set, val_set, test_set, parameters):
+def run_unet(save_path, train_set, val_set, test_set, parameters, validate_only=False):
     # train_set = augmentation_wrapper(train_set, n=parameters["augmentation_size"])
     # val_set = augmentation_wrapper(val_set, n=0)
     # test_set = augmentation_wrapper(test_set, n=0)
     # print("Loaded data", flush=True)
 
-    batch_size = parameters["batch_size"]
+    batch_size = 1
 
     loader_args = dict(
         num_workers=4,
@@ -546,145 +548,450 @@ def run_unet(save_path, train_set, val_set, test_set, parameters):
     )
     val_loader = DataLoader(val_set, shuffle=False,
                             batch_size=1, **loader_args)
+
     unet = UNet(n_channels=3, learning_rate=parameters["lr"])
 
     # check if the current save path has a checkpoint, if so, load from it
-    checkpoint = unet_get_checkpoint(save_path)
+    checkpoint = unet_get_checkpoint(
+        save_path, parameters["epoch"] if "epoch" in parameters else -1
+    )
     current_epoch = 0
     if checkpoint:
         current_epoch = unet.load_model(checkpoint) + 1
     else:
         unet.load_vgg_weights()
 
-    (
-        training_loss,
-        validation_loss,
-        validation_accuracy,
-        validation_f1_score,
-    ) = unet.train_model(
-        train_loader,
-        val_loader,
-        save_path,
-        max_epoch=3,
-        current_epoch=current_epoch,
-        threshold=0.5,
+    if not validate_only:
+        (
+            training_loss,
+            validation_loss,
+            validation_accuracy,
+            validation_f1_score,
+        ) = unet.train_model(
+            train_loader,
+            val_loader,
+            save_path,
+            max_epoch=15,
+            current_epoch=current_epoch,
+            threshold=parameters["threshold"] if "threshold" in parameters else 0.5,
+        )
+
+        return training_loss, validation_loss, validation_accuracy, validation_f1_score
+
+    else:
+        # only do validation
+        loss, matrix = unet.evaluate(
+            val_loader, threshold=parameters["threshold"])
+
+        return matrix
+
+
+def do_unet_hyperparameter_search(run_name, train_set_, val_set_, test_set_):
+    # hyperparameter lists
+    learning_rates = [1e-3, 5e-4, 1e-4]
+    augmentation_sizes = [0, 5, 10]
+    # thresholds = [0.5, 0.75, 0.8, 0.9]
+
+    # best params
+    # (epoch, value)
+    best_validation_accuracy = (0, -float("inf"))
+    best_accuracy_params = None
+    best_validation_f1score = (0, -float("inf"))
+    best_f1score_params = None
+
+    # graph a plot per configuration
+    fig, ax = plt.subplots(
+        nrows=len(augmentation_sizes), ncols=len(learning_rates), figsize=(20, 20)
+    )
+    fig.suptitle(
+        f"Plots of training and validation performance\n(Augmentation Size changes per row; Learning Rate changes per column)"
     )
 
-    return training_loss, validation_loss, validation_accuracy, validation_f1_score
+    # do grid search
+    for i, aug_size in enumerate(augmentation_sizes):
+        train_set = augmentation_wrapper(train_set_, n=aug_size)
+        val_set = augmentation_wrapper(val_set_, n=0)
+        test_set = augmentation_wrapper(test_set_, n=0)
+        print(f"Loaded data for augmentation size {aug_size}", flush=True)
 
-    # prediction = unet.predict(train_set[0][0])
-    # fig, ax = plt.subplots(rows=2, cols=2, figsize=(10, 5))
-    # ax = ax.ravel()
-    # ax[0].imshow(prediction, cmap="gray")
-    # ax[1].imshow(train_set[0][1], cmap="gray")
-    # fig.savefig(f"{save_path}/sample_imge.png")
+        for j, lr in enumerate(learning_rates):
+            # store the parameters
+            params = {"lr": lr, "augmentation_size": aug_size}
+
+            print(f"\nTraining with {params}")
+
+            # define the save location and create the folders as required
+            save_path = f"./models/unet/{run_name}/{lr}_{aug_size}"
+            os.makedirs(save_path, exist_ok=True)
+
+            # test this configuration
+            (
+                training_loss,
+                validation_loss,
+                validation_accuracy,
+                validation_f1_score,
+            ) = run_unet(
+                save_path,
+                deepcopy(train_set),
+                deepcopy(val_set),
+                deepcopy(test_set),
+                params,
+            )
+
+            # record the best params
+            for k in range(len(validation_accuracy)):
+                if validation_accuracy[k] > best_validation_accuracy[1]:
+                    best_validation_accuracy = (k, validation_accuracy[k])
+                    best_accuracy_params = params
+
+                if validation_f1_score[k] > best_validation_f1score[1]:
+                    best_validation_f1score = (k, validation_f1_score[k])
+                    best_f1score_params = params
+
+            # plot
+            ax[i, j].set_title(
+                f"Augmentation_size = {aug_size}; Learning Rate = {lr}")
+            ax[i, j].set_xlabel("# Epochs")
+            ax[i, j].plot(
+                training_loss, label="Training Loss" if i == j == 0 else None)
+            ax[i, j].plot(
+                validation_loss, label="Validation Loss" if i == j == 0 else None
+            )
+            ax[i, j].plot(
+                validation_accuracy,
+                label="Validation Accuracy" if i == j == 0 else None,
+            )
+            ax[i, j].plot(
+                validation_f1_score,
+                label="Validation F1 Score" if i == j == 0 else None,
+            )
+
+    # save the figure
+    fig.legend()
+    fig.savefig(
+        f"./models/unet/{run_name}/hyperparameter_tuning.png", format="png")
+
+    print("The best parameters are:")
+    print(
+        f"Validation Accuracy {best_validation_accuracy[1]} with params {best_accuracy_params} after Epoch {best_validation_accuracy[0]}"
+    )
+    print(
+        f"Validation F1 Score {best_validation_f1score[1]} with params {best_f1score_params} after Epoch {best_validation_f1score[0]}"
+    )
+
+
+def do_unet_threshold_tuning(run_name, train_set_, val_set_, test_set_):
+    # for each parameter configuration
+    # get the validation accuracy and f1 scores for each epoch, for each potential threshold
+    # plot the threshold evaluation for the epoch which had the highest threshold
+    # AND plot the threshold evaluation for the highest threshold across the epochs
+    """
+    Validation Accuracy 0.9971325719509939 with params {'lr': 0.0001, 'augmentation_size': 5} after Epoch 13
+    Validation F1 Score 0.9955362248449363 with params {'lr': 0.0001, 'augmentation_size': 5} after Epoch 13
+    """
+
+    # hyperparameter lists
+    lr = 1e-4
+    aug_size = 5
+    thresholds = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+    epoch = 13
+
+    # determine the save path for the model
+    model_path = f"./models/unet/15/{lr}_{aug_size}"
+    save_path = f"./models/unet/{run_name}"
+    os.makedirs(save_path, exist_ok=True)
+
+    val_set = augmentation_wrapper(val_set_, n=0)
+    train_set = augmentation_wrapper(train_set_, n=0)
+
+    best_acc = -float("inf")
+    best_threshold = None
+
+    # test the different thresholds for the given learning rate and augmentation size
+    precision_arr = []
+    recall_arr = []
+    false_positive_rate_arr = []
+    for t in thresholds:
+        # construct the parameter list
+        params = {
+            "lr": lr,
+            "augmentation_size": aug_size,
+            "threshold": t,
+            "epoch": epoch,
+        }
+
+        # evaluate this model
+        print(f"Evaluating {params}", flush=True)
+        matrix = run_unet(
+            model_path,
+            deepcopy(train_set),
+            deepcopy(val_set),
+            None,
+            params,
+            True,
+        )
+
+        # store the precision, recall, and false positive rate
+        precision_arr.append(precision(matrix))
+        recall_arr.append(recall(matrix))
+        false_positive_rate_arr.append(false_positive_rate(matrix))
+        val_acc = accuracy(matrix)
+
+        print(f"Validation Accuracy = {val_acc}")
+
+        # remember the best accuracy
+        if val_acc > best_acc:
+            best_acc = val_acc
+            best_threshold = t
+
+    # plot an ROC curve
+    font = 10
+    plt.suptitle(
+        f"ROC Curve for Learning Rate = {lr} and Augmentation Size = {aug_size}\n(Max Accuracy of {np.round(best_acc, 4)} at threshold {best_threshold})",
+        fontsize=font,
+    )
+    plt.plot(
+        [min(false_positive_rate_arr), max(false_positive_rate_arr)],
+        [min(recall_arr), max(recall_arr)],
+        label="Random",
+    )
+    plt.plot(
+        false_positive_rate_arr, recall_arr, label=f"model after epoch {epoch} used"
+    )
+    plt.xlabel("False Positive Rate", fontsize=font)
+    plt.ylabel("True Positive rate", fontsize=font)
+    plt.legend()
+    plt.savefig(f"{save_path}/roc.png", format="png")
+    plt.clf()
+
+    # plot a precision-recall curve
+    plt.suptitle(
+        f"Precision-Recall Curve for Learning Rate = {lr} and Augmentation Size = {aug_size}\n(Max Accuracy of {np.round(best_acc, 4)} at threshold {best_threshold})",
+        fontsize=font,
+    )
+    # plt.plot(
+    #     [min(recall_arr), max(recall_arr)],
+    #     [min(precision_arr), max(precision_arr)],
+    #     label="Random",
+    # )
+    plt.plot(recall_arr, precision_arr,
+             label=f"model after epoch {epoch} used")
+    plt.xlabel("Recall", fontsize=font)
+    plt.ylabel("Precision", fontsize=font)
+    plt.legend()
+    plt.savefig(f"{save_path}/precision-recall.png", format="png")
+    plt.clf()
+
+
+def do_unet_k_fold(run_name, images, masks, k, parameters):
+    # determine where to save
+    save_path = f"./models/unet/kfold/{run_name}"
+    os.makedirs(save_path, exist_ok=True)
+
+    # create a KFold model selection object
+    kfold = KFold(k)
+
+    # create a list of indices
+    indices = [i for i in range(len(images))]
+
+    # graph a plot for accuracy and f1 score
+    fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(20, 10))
+    fig.suptitle(
+        f"Plots of Test Accuracy and F1 Score for each of the k-splits (k = {k})"
+    )
+    ax[0].set_title("Test Accuracy")
+    ax[1].set_title("Test F1 Score")
+    ax[0].set_xlabel("# Epochs")
+    ax[1].set_xlabel("# Epochs")
+
+    # keep track for the average accuracy and f1 score per epoch
+    x_vals = [i for i in range(15)]
+    total_accuracy = np.zeros(15, dtype=np.float32)
+    total_f1_scores = np.zeros(15, dtype=np.float32)
+
+    # now do a train and evaluation on each split
+    i = 0
+    for train_indices, test_indices in kfold.split(indices):
+        # use the indices to construct data sets
+        train_set_ = [(images[i], masks[i]) for i in train_indices]
+        test_set_ = [(images[i], masks[i]) for i in test_indices]
+
+        # augment the images
+        train_set = augmentation_wrapper(
+            deepcopy(train_set_), n=parameters["augmentation_size"]
+        )
+        test_set = augmentation_wrapper(deepcopy(test_set_), n=0)
+        print(
+            f"Loaded data for augmentation size {parameters['augmentation_size']}",
+            flush=True,
+        )
+
+        fold_path = f"{save_path}/{i}"
+        os.makedirs(fold_path, exist_ok=True)
+
+        # train and evaluate on this combination
+        (
+            training_loss,
+            validation_loss,
+            validation_accuracy,
+            validation_f1_score,
+        ) = run_unet(
+            fold_path,
+            train_set,
+            test_set,
+            None,
+            parameters,
+        )
+
+        # track the avg and f1 scores
+        total_accuracy += np.array(validation_accuracy)
+        total_f1_scores += np.array(validation_f1_score)
+
+        # plot the f1 score and accuracy
+        ax[0].plot(x_vals, validation_accuracy, label=i)
+        ax[1].plot(x_vals, validation_f1_score)
+
+        i += 1
+
+    # average the accuracy and f1 scores
+    total_accuracy /= k
+    total_f1_scores /= k
+
+    ax[0].plot(x_vals, total_accuracy, label="average")
+    ax[1].plot(x_vals, total_f1_scores)
+
+    # save the figure
+    fig.legend()
+    fig.savefig(f"{save_path}/kfold.png", format="png")
+
+    print("The best average performance is:")
+    print(
+        f"Accuracy = {np.max(total_accuracy)} after Epoch {np.argmax(total_accuracy)}"
+    )
+    print(
+        f"F1 Score = {np.max(total_f1_scores)} after Epoch {np.argmax(total_f1_scores)}"
+    )
+
+
+def do_unet_test(model_path, train_set_, test_set_, parameters):
+    # filepath is the complete file path to the model to use for testing and prediction
+
+    train_set = augmentation_wrapper(train_set_, n=0)
+    test_set = augmentation_wrapper(test_set_, n=0)
+
+    # get the confusion matrix
+    matrix = run_unet(model_path, train_set, deepcopy(
+        test_set), None, parameters, True)
+
+    # print some stats
+    print(f"Test Accuracy = {accuracy(matrix)}")
+    print(f"Test F1 Score = {f1_score(matrix)}")
+
+
+def do_unet_prediction(model_path, plot_save_name, image, mask, parameters):
+    # image and mask should already have been augmented
+
+    # create the model
+    unet = UNet(n_channels=3, learning_rate=parameters["lr"])
+
+    # load from some checkpoint
+    checkpoint = unet_get_checkpoint(
+        model_path, parameters["epoch"] if "epoch" in parameters else -1
+    )
+    if checkpoint:
+        unet.load_model(checkpoint)
+    else:
+        unet.load_vgg_weights()
+
+    # evaluate the model
+    prediction = unet.predict(image, parameters["threshold"])
+
+    # crop the true masks
+    mask = mask.squeeze()
+    vert_dim = 0
+    hori_dim = 1
+    dim0_size_diff = mask.size()[vert_dim] - prediction.size()[vert_dim]
+    dim1_size_diff = mask.size()[hori_dim] - prediction.size()[hori_dim]
+
+    if dim0_size_diff != 0 and dim1_size_diff != 0:
+        mask = crop(
+            mask,
+            dim0_size_diff // 2,  # top left vertical component
+            dim1_size_diff // 2,  # top left horizontal component
+            prediction.size()[vert_dim],  # height of the cropped area
+            prediction.size()[hori_dim],  # width of the cropped area
+        )
+
+    # plot
+    fig, ax = plt.subplots(nrows=1, ncols=4, figsize=(20, 5))
+
+    acc = accuracy(
+        confusion_matrix(prediction.flatten(), mask.flatten(),
+                         parameters["threshold"])
+    )
+    fig.suptitle(f"Segmentation Accuracy = {np.round(acc, 4)}")
+
+    ax[0].set_title("Image")
+    ax[0].imshow(image.permute(1, 2, 0).numpy())
+    ax[1].set_title("Predicted Mask")
+    ax[1].imshow(prediction.numpy(), cmap="gray")
+    ax[2].set_title("True Mask")
+    ax[2].imshow(mask.numpy(), cmap="gray")
+    ax[3].set_title("Difference")
+    ax[3].imshow(
+        mask.numpy().astype(np.uint8) - prediction.numpy().astype(np.uint8), cmap="gray"
+    )
+
+    for a in ax:
+        a.axis("off")
+
+    fig.savefig(plot_save_name, bbox_inches="tight", format="png")
 
 
 if __name__ == "__main__":
-    run_gmm()
+    # read in the data for unet
+    # --------------------------- DO NOT TOUCH ---------------------------
+    images, masks = read_data()
+    images = images.astype(np.float32) / 255.0
 
-    # UNet ------------------------------------------
-    # read the images
-    if 0:
-        images, masks = read_data()
-        images = images.astype(np.float32) / 255.0
+    train_set_, val_set_, test_set_ = split_dataset(images, masks)
+    # --------------------------- DO NOT TOUCH ---------------------------
 
-        train_set_, val_set_, test_set_ = split_dataset(images, masks)
+    # hyperparameter search
+    # do_unet_hyperparameter_search("15", train_set_, val_set_, test_set_)
 
-        # hyperparameter lists
-        learning_rates = [1e-3, 1e-4]
-        batch_sizes = [1]
-        augmentation_sizes = [0, 5, 10]
-        # thresholds = [0.5, 0.75, 0.8, 0.9]
+    # do the threshold tuning
+    # do_unet_threshold_tuning("15_thresholds", train_set_, val_set_, test_set_)
 
-        # best params
-        # (epoch, value)
-        best_validation_accuracy = (0, -float("inf"))
-        best_accuracy_params = None
-        best_validation_f1score = (0, -float("inf"))
-        best_f1score_params = None
+    # do k-fold validation
+    # do_unet_k_fold(
+    #     "15", images, masks, 6, {"lr": 1e-4, "threshold": 0.4, "augmentation_size": 5}
+    # )
 
-        # do grid search
-        for lr in learning_rates:
-            # graph a plot per configuration
-            fig, ax = plt.subplots(
-                nrows=len(augmentation_sizes), ncols=len(batch_sizes), figsize=(20, 20)
-            )
-            fig.suptitle(
-                f"Plots for a learning rate of {lr}\n(Batch Size changes per row; Augmentation Size changes per column)"
-            )
+    # evaluate on the test set
+    # do_unet_test(
+    #     "./models/unet/15/0.0001_5",
+    #     train_set_,
+    #     test_set_,
+    #     {"lr": 1e-4, "threshold": 0.4, "augmentation_size": 5, "epoch": 13},
+    # )
 
-            for j, aug_size in enumerate(augmentation_sizes):
-                train_set = augmentation_wrapper(train_set_, n=aug_size)
-                val_set = augmentation_wrapper(val_set_, n=0)
-                test_set = augmentation_wrapper(test_set_, n=0)
-                print(
-                    f"Loaded data for augmentation size {aug_size}", flush=True)
+    # do prediction on some images
+    test_set = augmentation_wrapper(test_set_, n=0)
+    image_save_path = "./models/unet/images"
+    os.makedirs(image_save_path, exist_ok=True)
+    images_to_examine = [0, 1, 2, 3, 4]
+    for i in images_to_examine:
+        if i < 0 or i >= len(test_set):
+            print(f"Image {i} does not exist. Skipping...")
+            continue
+        else:
+            print(f"Processing Image {i}")
 
-                for i, bs in enumerate(batch_sizes):
-                    # store the parameters
-                    params = {"lr": lr, "batch_size": bs,
-                              "augmentation_size": aug_size}
-
-                    print(f"\nTraining with {params}")
-
-                    # define the save location and create the folders as required
-                    save_path = f"./models/unet/test_params_1/{lr}_{bs}_{aug_size}"
-                    os.makedirs(save_path, exist_ok=True)
-
-                    # test this configuration
-                    (
-                        training_loss,
-                        validation_loss,
-                        validation_accuracy,
-                        validation_f1_score,
-                    ) = run_unet(
-                        save_path,
-                        deepcopy(train_set),
-                        deepcopy(val_set),
-                        deepcopy(test_set),
-                        params,
-                    )
-
-                    # record the best params
-                    for k in range(len(validation_accuracy)):
-                        if validation_accuracy[k] > best_validation_accuracy[1]:
-                            best_validation_accuracy = (
-                                k, validation_accuracy[k])
-                            best_accuracy_params = params
-
-                        if validation_f1_score[k] > best_validation_f1score[1]:
-                            best_validation_f1score = (
-                                k, validation_f1_score[k])
-                            best_f1score_params = params
-
-                    # plot
-                    ax[i, j].set_title(
-                        f"Batch size = {bs}; Augmentation_size = {aug_size}")
-                    ax[i, j].set_xlabel("# Epochs")
-                    ax[i, j].plot(training_loss, label="Training Loss")
-                    ax[i, j].plot(validation_loss, label="Validation Loss")
-                    ax[i, j].plot(validation_accuracy,
-                                  label="Validation Accuracy")
-                    ax[i, j].plot(validation_f1_score,
-                                  label="Validation F1 Score")
-
-            # save the figure
-            fig.legend(loc="best")
-            fig.savefig(f"hyperparameter_tuning_lr_{lr}.png", format="png")
-
-        print("The best parameters are:")
-        print(
-            f"Validation Accuracy {best_validation_accuracy[1]} with params {best_accuracy_params} after Epoch {best_validation_accuracy[0]}"
+        do_unet_prediction(
+            "./models/unet/15/0.0001_5",
+            f"{image_save_path}/{i}.png",
+            test_set[i][0],
+            test_set[i][1],
+            {"lr": 1e-4, "threshold": 0.4, "augmentation_size": 5, "epoch": 13},
         )
-        print(
-            f"Validation F1 Score {best_validation_f1score[1]} with params {best_f1score_params} after Epoch {best_validation_f1score[0]}"
-        )
-
-"""
-UNet hyperparameters to tune:
-- learning rate
-- batch size
-- amount of augmentation
-- threshold
-"""

@@ -230,14 +230,13 @@ class UNet(nn.Module):
 
         for i in range(current_epoch, max_epoch):
             print("Starting epoch {}".format(i))
-            # if i == epochs_to_unfreeze:
-            #     print("Unfreezing VGG layers")
-            #     self.unfreeze_vgg_layers()
 
             epoch_loss = 0
             # https://github.com/milesial/Pytorch-UNet/blob/master/train.py
             with tqdm(
-                total=len(train_data_loader), desc=f"Epoch {i}/{max_epoch-1}", unit="img"
+                total=len(train_data_loader),
+                desc=f"Epoch {i}/{max_epoch-1}",
+                unit="img",
             ) as pbar:
                 for batch in train_data_loader:
                     images = batch[0]
@@ -318,18 +317,22 @@ class UNet(nn.Module):
 
         return training_loss, validation_loss, validation_accuracy, validation_f1_score
 
-    def predict(self, image, threshold=0.5):
+    def predict(self, image, threshold):
         # predict the output image
         self.eval()
 
         with torch.no_grad():
             image = image.to(device=device, dtype=torch.float32)
 
-            pred_mask = self(image)
+            # pass through the network
+            pred_mask = self(image.unsqueeze(0))
 
             pred_mask = pred_mask.to("cpu")
 
-        return pred_mask.detach().numpy()
+            # threshold the predicted mask
+            pred_mask = pred_mask.detach().squeeze() > threshold
+
+        return pred_mask
 
     def forward(self, x):
         # pass the image through the unet
@@ -356,12 +359,6 @@ class UNet(nn.Module):
 
         # sigmoid activation to map to (0, 1) -> use 0.5 as a threshold
         return torch.sigmoid(x)
-
-    # def unfreeze_vgg_layers(self):
-    #     layers_to_unfreeze = [self.initial, self.down1, self.down2, self.down3]
-    #     for layer in layers_to_unfreeze:
-    #         for i, param in enumerate(layer.parameters()):
-    #             param.requires_grad_(True)
 
     def load_vgg_weights(self):
         # load the pretrained weights for the relevant layers
@@ -402,11 +399,6 @@ class UNet(nn.Module):
         self.down1.load_conv_weights(vgg, 5, 7)
         self.down2.load_conv_weights(vgg, 10, 12)
         self.down3.load_conv_weights(vgg, 17, 19)
-
-        # layers_to_freeze = [self.initial, self.down1, self.down2, self.down3]
-        # for layer in layers_to_freeze:
-        #     for i, param in enumerate(layer.parameters()):
-        #         param.requires_grad_(False)
 
         print("Finished loading")
 
