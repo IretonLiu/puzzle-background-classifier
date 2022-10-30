@@ -5,7 +5,7 @@ from torchvision.models import vgg16, VGG16_Weights
 import torch
 from tqdm import tqdm
 import numpy as np
-from utils import confusion_matrix, accuracy, f1_score, free_gpu_memory
+from utils import confusion_matrix, accuracy, f1_score
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -166,17 +166,20 @@ class UNet(nn.Module):
                     )
 
                     images = images.to(device=device, dtype=torch.float32)
-                    true_masks = true_masks.to(device=device, dtype=torch.float32)
+                    true_masks = true_masks.to(
+                        device=device, dtype=torch.float32)
 
                     pred_masks = self(images)
 
                     vert_dim = 2
                     hori_dim = 3
                     dim0_size_diff = (
-                        true_masks.size()[vert_dim] - pred_masks.size()[vert_dim]
+                        true_masks.size()[vert_dim] -
+                        pred_masks.size()[vert_dim]
                     )
                     dim1_size_diff = (
-                        true_masks.size()[hori_dim] - pred_masks.size()[hori_dim]
+                        true_masks.size()[hori_dim] -
+                        pred_masks.size()[hori_dim]
                     )
 
                     # crop the true masks
@@ -185,8 +188,10 @@ class UNet(nn.Module):
                             true_masks,
                             dim0_size_diff // 2,  # top left vertical component
                             dim1_size_diff // 2,  # top left horizontal component
-                            pred_masks.size()[vert_dim],  # height of the cropped area
-                            pred_masks.size()[hori_dim],  # width of the cropped area
+                            # height of the cropped area
+                            pred_masks.size()[vert_dim],
+                            # width of the cropped area
+                            pred_masks.size()[hori_dim],
                         )
 
                     loss = F.mse_loss(pred_masks, true_masks)
@@ -202,11 +207,6 @@ class UNet(nn.Module):
                         confusion_matrices += confusion_matrix(
                             pred.flatten(), true.flatten(), threshold
                         )
-
-                    free_gpu_memory(pred_masks)
-                    free_gpu_memory(true_masks)
-                    free_gpu_memory(images)
-
         self.train()
         return val_loss, confusion_matrices / np.sum(confusion_matrices)
 
@@ -250,7 +250,8 @@ class UNet(nn.Module):
                     )
 
                     images = images.to(device=device, dtype=torch.float32)
-                    true_masks = true_masks.to(device=device, dtype=torch.float32)
+                    true_masks = true_masks.to(
+                        device=device, dtype=torch.float32)
 
                     # clear the gradients
                     self.optimiser.zero_grad()
@@ -262,10 +263,12 @@ class UNet(nn.Module):
                     vert_dim = 2
                     hori_dim = 3
                     dim0_size_diff = (
-                        true_masks.size()[vert_dim] - pred_masks.size()[vert_dim]
+                        true_masks.size()[vert_dim] -
+                        pred_masks.size()[vert_dim]
                     )
                     dim1_size_diff = (
-                        true_masks.size()[hori_dim] - pred_masks.size()[hori_dim]
+                        true_masks.size()[hori_dim] -
+                        pred_masks.size()[hori_dim]
                     )
 
                     # crop the true masks
@@ -274,8 +277,10 @@ class UNet(nn.Module):
                             true_masks,
                             dim0_size_diff // 2,  # top left vertical component
                             dim1_size_diff // 2,  # top left horizontal component
-                            pred_masks.size()[vert_dim],  # height of the cropped area
-                            pred_masks.size()[hori_dim],  # width of the cropped area
+                            # height of the cropped area
+                            pred_masks.size()[vert_dim],
+                            # width of the cropped area
+                            pred_masks.size()[hori_dim],
                         )
 
                     # calculate the loss
@@ -292,10 +297,6 @@ class UNet(nn.Module):
                     pbar.set_postfix(**{"loss (batch)": loss.detach().item()})
 
                     print("", end="", flush=True)
-
-                    free_gpu_memory(pred_masks)
-                    free_gpu_memory(true_masks)
-                    free_gpu_memory(images)
 
             # save model and to evaluation on validation data
             path = f"{save_path}/epoch_{i}.pt"
@@ -314,7 +315,7 @@ class UNet(nn.Module):
             print(f"\tvalidation accuracy = {validation_accuracy[-1]}")
             print(f"\tvalidation F1 Score = {validation_f1_score[-1]}")
             print("", end="", flush=True)
-        
+
         return training_loss, validation_loss, validation_accuracy, validation_f1_score
 
     def predict(self, image, threshold=0.5):

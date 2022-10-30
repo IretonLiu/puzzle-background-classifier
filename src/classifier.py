@@ -14,4 +14,4 @@ class Classifier:
         prior = [1-np.sum(self.labels)/len(self.labels),
                  np.sum(self.labels)/len(self.labels)]
 
-        return np.array([likelihoods[i].pdf(self.data)*prior[i] for i in range(2)])
+        return np.array([likelihoods[i].score_samples(self.data)*prior[i] for i in range(2)])

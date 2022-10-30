@@ -121,5 +121,5 @@ class GaussianMixtureModel():
         except FileNotFoundError:
             print("No such file or directory")
 
-    def pdf(self, data):
+    def score_samples(self, data):
         return np.sum([self.l[i]*multivariate_normal(mean=self.means_[i], cov=self.covariances_[i]).pdf(data) for i in range(self.n_components)], axis=0)

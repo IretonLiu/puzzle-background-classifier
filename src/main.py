@@ -9,12 +9,13 @@ from tqdm import tqdm
 from copy import deepcopy
 
 # from matplotlib.pyplot import scatter
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import numpy as np
 from gmm import GaussianMixtureModel
 from scipy.stats import multivariate_normal
 from ellipsoid import get_cov_ellipsoid
 from sklearn.mixture import GaussianMixture
+from sklearn.model_selection import KFold
 from classifier import Classifier
 from unet import UNet
 
@@ -28,7 +29,7 @@ from utils import (
     precision,
     recall,
     f1_score,
-    free_gpu_memory,
+
 )
 
 res = (1024, 768)
@@ -235,51 +236,50 @@ def train_gmm(
     train_images, train_masks = zip(*train_set)
     train_images = np.array(train_images)
     train_masks = np.array(train_masks)
-    if 0:
 
-        # fit the model
-        for feature in features:
-            print("Training with feature: {}".format(feature))
-            # convert to feature vectors
+    # fit the model
+    for feature in features:
+        print("Training with feature: {}".format(feature))
+        # convert to feature vectors
 
-            train_data = to_feature_vector(train_images, feature)
-            train_data_masks = train_masks.reshape(-1, 1)
+        train_data = to_feature_vector(train_images, feature)
+        train_data_masks = train_masks.reshape(-1, 1)
 
-            train_data_foreground = train_data[train_data_masks[:, 0]]
-            train_data_background = train_data[~train_data_masks[:, 0]]
+        train_data_foreground = train_data[train_data_masks[:, 0]]
+        train_data_background = train_data[~train_data_masks[:, 0]]
 
-            if 0:
-                for background_h in background_h_list:
-                    print("Training background GMM with h = {}".format(background_h))
-                    start_time = time.time()
-                    gmm_background = GaussianMixtureModel(
-                        background_h, train_data_background.shape[1], max_iter=500, seed=4
-                    )
-                    gmm_background.fit(train_data_background)
-                    print("Training time:", (time.time() - start_time))
-                    gmm_background.save_model(
-                        f"models/gmm/{feature}/background/{background_h}/"
-                    )
-                    print(flush=True, end="")
+        if 0:
+            for background_h in background_h_list:
+                print("Training background GMM with h = {}".format(background_h))
+                start_time = time.time()
+                gmm_background = GaussianMixtureModel(
+                    background_h, train_data_background.shape[1], max_iter=500, seed=4
+                )
+                gmm_background.fit(train_data_background)
+                print("Training time:", (time.time() - start_time))
+                gmm_background.save_model(
+                    f"models/gmm/{feature}/background/{background_h}/"
+                )
+                print(flush=True, end="")
 
-            if 1:
-                for foreground_h in foreground_h_list:
-                    print("Training foreground GMM with h = {}".format(foreground_h))
-                    start_time = time.time()
-                    gmm_foreground = GaussianMixtureModel(
-                        foreground_h, train_data_foreground.shape[1], max_iter=500, seed=2
-                    )
-                    try:
-                        gmm_foreground.fit(train_data_foreground)
-                    except:
-                        print("Failed to fit foreground GMM with h = {}".format())
-                        continue
-                    print("Training time:", (time.time() - start_time))
-                    gmm_foreground.save_model(
-                        f"models/gmm/{feature}/foreground/{foreground_h}/"
-                    )
-                    print(flush=True, end="")
-            print("=============================================================")
+        if 1:
+            for foreground_h in foreground_h_list:
+                print("Training foreground GMM with h = {}".format(foreground_h))
+                start_time = time.time()
+                gmm_foreground = GaussianMixtureModel(
+                    foreground_h, train_data_foreground.shape[1], max_iter=500, seed=2
+                )
+                try:
+                    gmm_foreground.fit(train_data_foreground)
+                except:
+                    print("Failed to fit foreground GMM with h = {}".format())
+                    continue
+                print("Training time:", (time.time() - start_time))
+                gmm_foreground.save_model(
+                    f"models/gmm/{feature}/foreground/{foreground_h}/"
+                )
+                print(flush=True, end="")
+        print("=============================================================")
 
 
 def validate_gmm(val_set, features, background_h_list, foreground_h_list):
@@ -400,12 +400,12 @@ def test_gmm(test_set, best_feature, best_foreground_h, best_background_h):
     test_masks = test_masks.reshape((len(test_masks), -1))
     for prediction, mask in zip(predictions, test_masks):
         # plot prediction and mask side by side
-        plt.figure(figsize=(10, 10))
-        plt.subplot(1, 2, 1)
-        plt.imshow(prediction.reshape(768, 1024))
-        plt.subplot(1, 2, 2)
-        plt.imshow(mask.reshape(768, 1024))
-        plt.show()
+        # plt.figure(figsize=(10, 10))
+        # plt.subplot(1, 2, 1)
+        # plt.imshow(prediction.reshape(768, 1024))
+        # plt.subplot(1, 2, 2)
+        # plt.imshow(mask.reshape(768, 1024))
+        # plt.show()
 
         c_matrix = confusion_matrix(mask, prediction)
         accuracy_score = accuracy(c_matrix)
@@ -418,36 +418,83 @@ def test_gmm(test_set, best_feature, best_foreground_h, best_background_h):
         print("Recall score:", recall_score)
 
 
+def gmm_cross_validation(images, masks, best_feature, best_foreground_h, best_background_h):
+    # performing 6-fold cross validation
+    kf = KFold(n_splits=6)
+
+    for train_index, test_index in kf.split(images):
+        train_images, test_images = images[train_index], images[test_index]
+        train_masks, test_masks = masks[train_index], masks[test_index]
+        train_set = list(zip(train_images, train_masks))
+        test_set = list(zip(test_images, test_masks))
+
+        train_data = to_feature_vector(train_images, best_feature)
+        train_data_masks = train_masks.reshape(-1, 1)
+
+        # train
+        print("Training GMM...")
+        train_data_foreground = train_data[train_data_masks[:, 0]]
+        train_data_background = train_data[~train_data_masks[:, 0]]
+        gmm_background = GaussianMixture(
+            n_components=best_background_h).fit(train_data_background)
+        gmm_foreground = GaussianMixture(
+            n_components=best_foreground_h).fit(train_data_foreground)
+
+        # test
+        print("Testing GMM...")
+        test_images, test_masks = zip(*test_set)
+        test_images = np.array(test_images)
+        test_masks = np.array(test_masks)
+
+        test_data = to_feature_vector(test_images, best_feature)
+        test_data_masks = test_masks.reshape(-1, 1)
+        classifier = Classifier(test_data, test_data_masks)
+
+        likelihoods = [gmm_background, gmm_foreground]
+        probabilities = classifier.maximum_a_posteriori(likelihoods)
+        predictions = np.argmax(probabilities, axis=0) == 1
+        predictions = post_processing(
+            predictions.reshape(test_masks.shape).astype(np.float32)
+        )
+
+        c_matrix = confusion_matrix(test_data_masks, predictions)
+        accuracy_score = accuracy(c_matrix)
+        precision_score = precision(c_matrix)
+        recall_score = recall(c_matrix)
+        print("Confusion matrix:")
+        print(c_matrix)
+        print("Accuracy score:", accuracy_score)
+        print("Precision score:", precision_score)
+        print("Recall score:", recall_score)
+        print("=====================")
+
+
 def run_gmm():
 
     images, masks = read_data()
     train_set, val_set, test_set = split_dataset(images, masks)
-    # for image, mask in train_set:
-    #     plt.figure(figsize=(10, 10))
-    #     plt.subplot(1, 2, 1)
-    #     plt.imshow(image)
-    #     plt.subplot(1, 2, 2)
-    #     plt.imshow(mask)
-    #     plt.show()
+
     # hyperparameters
     # list of feature sets to use
     features = ["rgb", "rgb+dog", "hsv", "hsv+xy", "all"]
-    # features = ["all"]
-    foreground_h_list = [2, 3, 4, 5, 6, 7, 8]
-    background_h_list = [2, 3, 4, 5, 6]
-    train_gmm(train_set, features, background_h_list, foreground_h_list)
-
-    # foreground_h_list = [3, 4, 5, 6]
+    # # features = ["all"]
+    # foreground_h_list = [2, 3, 4, 5, 6, 7, 8]
     # background_h_list = [2, 3, 4, 5, 6]
-    # # find optimal hyperparameters
+    # train_gmm(train_set, features, background_h_list, foreground_h_list)
+
+    foreground_h_list = [2, 3, 4, 5, 6, 7, 8]
+    background_h_list = [2, 3, 4]
+    # find optimal hyperparameters
 
     # best_feature, best_foreground_h, best_background_h = validate_gmm(
     #     val_set, features, background_h_list, foreground_h_list)
-    # best_feature = "all"
-    # best_foreground_h = 4
-    # best_background_h = 3
+    best_feature = "rgb+dog"
+    best_foreground_h = 5
+    best_background_h = 4
     # # test the model
     # test_gmm(test_set, best_feature, best_foreground_h, best_background_h)
+    gmm_cross_validation(images, masks, best_feature,
+                         best_foreground_h, best_background_h)
 
 
 def unet_get_checkpoint(path):
@@ -523,21 +570,6 @@ def run_unet(save_path, train_set, val_set, test_set, parameters):
         threshold=0.5,
     )
 
-    # free the CUDA memory
-    print(torch.cuda.memory_summary())
-    free_gpu_memory(unet)
-    free_gpu_memory(train_loader)
-    free_gpu_memory(val_loader)
-    print(torch.cuda.memory_summary())
-
-    # prints currently alive Tensors and Variables
-    for obj in gc.get_objects():
-        try:
-            if torch.is_tensor(obj) or (hasattr(obj, 'data') and torch.is_tensor(obj.data)):
-                print(type(obj), obj.size())
-        except:
-            pass
-
     return training_loss, validation_loss, validation_accuracy, validation_f1_score
 
     # prediction = unet.predict(train_set[0][0])
@@ -549,99 +581,105 @@ def run_unet(save_path, train_set, val_set, test_set, parameters):
 
 
 if __name__ == "__main__":
-    # run_gmm()
+    run_gmm()
 
     # UNet ------------------------------------------
     # read the images
-    images, masks = read_data()
-    images = images.astype(np.float32) / 255.0
+    if 0:
+        images, masks = read_data()
+        images = images.astype(np.float32) / 255.0
 
-    train_set, val_set, test_set = split_dataset(images, masks)
+        train_set_, val_set_, test_set_ = split_dataset(images, masks)
 
-    # hyperparameter lists
-    learning_rates = [1e-3, 1e-4]
-    batch_sizes = [1, 8, 16]
-    augmentation_sizes = [0, 5, 10]
-    # thresholds = [0.5, 0.75, 0.8, 0.9]
+        # hyperparameter lists
+        learning_rates = [1e-3, 1e-4]
+        batch_sizes = [1]
+        augmentation_sizes = [0, 5, 10]
+        # thresholds = [0.5, 0.75, 0.8, 0.9]
 
-    # best params
-    # (epoch, value)
-    best_validation_accuracy = (0, -float("inf"))
-    best_accuracy_params = None
-    best_validation_f1score = (0, -float("inf"))
-    best_f1score_params = None
+        # best params
+        # (epoch, value)
+        best_validation_accuracy = (0, -float("inf"))
+        best_accuracy_params = None
+        best_validation_f1score = (0, -float("inf"))
+        best_f1score_params = None
 
-    # do grid search
-    for lr in learning_rates:
-        # graph a plot per configuration
-        fig, ax = plt.subplots(
-            nrows=len(augmentation_sizes), ncols=len(batch_sizes), figsize=(20, 20)
+        # do grid search
+        for lr in learning_rates:
+            # graph a plot per configuration
+            fig, ax = plt.subplots(
+                nrows=len(augmentation_sizes), ncols=len(batch_sizes), figsize=(20, 20)
+            )
+            fig.suptitle(
+                f"Plots for a learning rate of {lr}\n(Batch Size changes per row; Augmentation Size changes per column)"
+            )
+
+            for j, aug_size in enumerate(augmentation_sizes):
+                train_set = augmentation_wrapper(train_set_, n=aug_size)
+                val_set = augmentation_wrapper(val_set_, n=0)
+                test_set = augmentation_wrapper(test_set_, n=0)
+                print(
+                    f"Loaded data for augmentation size {aug_size}", flush=True)
+
+                for i, bs in enumerate(batch_sizes):
+                    # store the parameters
+                    params = {"lr": lr, "batch_size": bs,
+                              "augmentation_size": aug_size}
+
+                    print(f"\nTraining with {params}")
+
+                    # define the save location and create the folders as required
+                    save_path = f"./models/unet/test_params_1/{lr}_{bs}_{aug_size}"
+                    os.makedirs(save_path, exist_ok=True)
+
+                    # test this configuration
+                    (
+                        training_loss,
+                        validation_loss,
+                        validation_accuracy,
+                        validation_f1_score,
+                    ) = run_unet(
+                        save_path,
+                        deepcopy(train_set),
+                        deepcopy(val_set),
+                        deepcopy(test_set),
+                        params,
+                    )
+
+                    # record the best params
+                    for k in range(len(validation_accuracy)):
+                        if validation_accuracy[k] > best_validation_accuracy[1]:
+                            best_validation_accuracy = (
+                                k, validation_accuracy[k])
+                            best_accuracy_params = params
+
+                        if validation_f1_score[k] > best_validation_f1score[1]:
+                            best_validation_f1score = (
+                                k, validation_f1_score[k])
+                            best_f1score_params = params
+
+                    # plot
+                    ax[i, j].set_title(
+                        f"Batch size = {bs}; Augmentation_size = {aug_size}")
+                    ax[i, j].set_xlabel("# Epochs")
+                    ax[i, j].plot(training_loss, label="Training Loss")
+                    ax[i, j].plot(validation_loss, label="Validation Loss")
+                    ax[i, j].plot(validation_accuracy,
+                                  label="Validation Accuracy")
+                    ax[i, j].plot(validation_f1_score,
+                                  label="Validation F1 Score")
+
+            # save the figure
+            fig.legend(loc="best")
+            fig.savefig(f"hyperparameter_tuning_lr_{lr}.png", format="png")
+
+        print("The best parameters are:")
+        print(
+            f"Validation Accuracy {best_validation_accuracy[1]} with params {best_accuracy_params} after Epoch {best_validation_accuracy[0]}"
         )
-        fig.suptitle(
-            f"Plots for a learning rate of {lr}\n(Batch Size changes per row; Augmentation Size changes per column)"
+        print(
+            f"Validation F1 Score {best_validation_f1score[1]} with params {best_f1score_params} after Epoch {best_validation_f1score[0]}"
         )
-
-        for j, aug_size in enumerate(augmentation_sizes):
-            train_set = augmentation_wrapper(train_set, n=aug_size)
-            val_set = augmentation_wrapper(val_set, n=0)
-            test_set = augmentation_wrapper(test_set, n=0)
-            print(f"Loaded data for augmentation size {aug_size}", flush=True)
-
-            for i, bs in enumerate(batch_sizes):
-                # store the parameters
-                params = {"lr": lr, "batch_size": bs,
-                          "augmentation_size": aug_size}
-
-                print(f"\nTraining with {params}")
-
-                # define the save location and create the folders as required
-                save_path = f"./models/unet/test_params_1/{lr}_{bs}_{aug_size}"
-                os.makedirs(save_path, exist_ok=True)
-
-                # test this configuration
-                (
-                    training_loss,
-                    validation_loss,
-                    validation_accuracy,
-                    validation_f1_score,
-                ) = run_unet(
-                    save_path,
-                    deepcopy(train_set),
-                    deepcopy(val_set),
-                    deepcopy(test_set),
-                    params,
-                )
-
-                # record the best params
-                for k in range(len(validation_accuracy)):
-                    if validation_accuracy[k] > best_validation_accuracy[1]:
-                        best_validation_accuracy = (k, validation_accuracy[k])
-                        best_accuracy_params = params
-
-                    if validation_f1_score[k] > best_validation_f1score[1]:
-                        best_validation_f1score = (k, validation_f1_score[k])
-                        best_f1score_params = params
-
-                # plot
-                ax[i, j].set_title(
-                    f"Batch size = {bs}; Augmentation_size = {aug_size}")
-                ax[i, j].set_xlabel("# Epochs")
-                ax[i, j].plot(training_loss, label="Training Loss")
-                ax[i, j].plot(validation_loss, label="Validation Loss")
-                ax[i, j].plot(validation_accuracy, label="Validation Accuracy")
-                ax[i, j].plot(validation_f1_score, label="Validation F1 Score")
-
-        # save the figure
-        fig.legend(loc="best")
-        fig.savefig(f"hyperparameter_tuning_lr_{lr}.png", format="png")
-
-    print("The best parameters are:")
-    print(
-        f"Validation Accuracy {best_validation_accuracy[1]} with params {best_accuracy_params} after Epoch {best_validation_accuracy[0]}"
-    )
-    print(
-        f"Validation F1 Score {best_validation_f1score[1]} with params {best_f1score_params} after Epoch {best_validation_f1score[0]}"
-    )
 
 """
 UNet hyperparameters to tune:
