@@ -15,6 +15,7 @@ from gmm import GaussianMixtureModel
 from scipy.stats import multivariate_normal
 from ellipsoid import get_cov_ellipsoid
 from sklearn.mixture import GaussianMixture
+from sklearn.model_selection import KFold
 from classifier import Classifier
 from unet import UNet
 
@@ -25,6 +26,7 @@ from torchvision import transforms as T
 from utils import (
     confusion_matrix,
     accuracy,
+    false_positive_rate,
     precision,
     recall,
     f1_score,
@@ -435,13 +437,14 @@ def run_gmm():
     test_gmm(test_set, best_feature, best_foreground_h, best_background_h)
 
 
-def unet_get_checkpoint(path):
+def unet_get_checkpoint(path, number):
+    # number is the epoch to load
     # get the name of the latest model
     dirs = glob.glob(f"{path}/*.pt")
     if len(dirs) == 0:
         return None
 
-    return natsorted(dirs)[-1]
+    return natsorted(dirs)[number]
 
 
 def augmentation_wrapper(data, n):
@@ -466,7 +469,7 @@ def augmentation_wrapper(data, n):
     return output
 
 
-def run_unet(save_path, train_set, val_set, test_set, parameters):
+def run_unet(save_path, train_set, val_set, test_set, parameters, validate_only=False):
     # train_set = augmentation_wrapper(train_set, n=parameters["augmentation_size"])
     # val_set = augmentation_wrapper(val_set, n=0)
     # test_set = augmentation_wrapper(test_set, n=0)
@@ -487,28 +490,37 @@ def run_unet(save_path, train_set, val_set, test_set, parameters):
     unet = UNet(n_channels=3, learning_rate=parameters["lr"])
 
     # check if the current save path has a checkpoint, if so, load from it
-    checkpoint = unet_get_checkpoint(save_path)
+    checkpoint = unet_get_checkpoint(
+        save_path, parameters["epoch"] if "epoch" in parameters else -1
+    )
     current_epoch = 0
     if checkpoint:
         current_epoch = unet.load_model(checkpoint) + 1
     else:
         unet.load_vgg_weights()
 
-    (
-        training_loss,
-        validation_loss,
-        validation_accuracy,
-        validation_f1_score,
-    ) = unet.train_model(
-        train_loader,
-        val_loader,
-        save_path,
-        max_epoch=15,
-        current_epoch=current_epoch,
-        threshold=0.5,
-    )
+    if not validate_only:
+        (
+            training_loss,
+            validation_loss,
+            validation_accuracy,
+            validation_f1_score,
+        ) = unet.train_model(
+            train_loader,
+            val_loader,
+            save_path,
+            max_epoch=15,
+            current_epoch=current_epoch,
+            threshold=0.5,
+        )
 
-    return training_loss, validation_loss, validation_accuracy, validation_f1_score
+        return training_loss, validation_loss, validation_accuracy, validation_f1_score
+
+    else:
+        # only do validation
+        loss, matrix = unet.evaluate(val_loader, threshold=parameters["threshold"])
+
+        return matrix
 
     # prediction = unet.predict(train_set[0][0])
     # fig, ax = plt.subplots(rows=2, cols=2, figsize=(10, 5))
@@ -518,17 +530,7 @@ def run_unet(save_path, train_set, val_set, test_set, parameters):
     # fig.savefig(f"{save_path}/sample_imge.png")
 
 
-if __name__ == "__main__":
-    # run_gmm()
-
-    # UNet ------------------------------------------
-    run_name = "15"
-    # read the images
-    images, masks = read_data()
-    images = images.astype(np.float32) / 255.0
-
-    train_set_, val_set_, test_set_ = split_dataset(images, masks)
-
+def do_unet_hyperparameter_search(run_name, train_set_, val_set_, test_set_):
     # hyperparameter lists
     learning_rates = [1e-3, 5e-4, 1e-4]
     augmentation_sizes = [0, 5, 10]
@@ -618,10 +620,109 @@ if __name__ == "__main__":
         f"Validation F1 Score {best_validation_f1score[1]} with params {best_f1score_params} after Epoch {best_validation_f1score[0]}"
     )
 
-"""
-UNet hyperparameters to tune:
-- learning rate
-- batch size
-- amount of augmentation
-- threshold
-"""
+
+def do_unet_threshold_tuning(run_name, train_set_, val_set_, test_set_):
+    # for each parameter configuration
+    # get the validation accuracy and f1 scores for each epoch, for each potential threshold
+    # plot the threshold evaluation for the epoch which had the highest threshold
+    # AND plot the threshold evaluation for the highest threshold across the epochs
+
+    """
+    Validation Accuracy 0.9971325719509939 with params {'lr': 0.0001, 'augmentation_size': 5} after Epoch 13
+    Validation F1 Score 0.9955362248449363 with params {'lr': 0.0001, 'augmentation_size': 5} after Epoch 13
+    """
+
+    # hyperparameter lists
+    lr = 1e-4
+    aug_size = 5
+    thresholds = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+    epoch = 13
+
+    # determine the save path for the model
+    model_path = f"./models/unet/15/{lr}_{aug_size}"
+    save_path = f"./models/unet/{run_name}"
+    os.makedirs(save_path, exist_ok=True)
+
+    val_set = augmentation_wrapper(val_set_, n=0)
+    train_set = augmentation_wrapper(train_set_, n=0)
+
+    best_acc = -float("inf")
+    best_threshold = None
+
+    # test the different thresholds for the given learning rate and augmentation size
+    precision_arr = []
+    recall_arr = []
+    false_positive_rate_arr = []
+    for t in thresholds:
+        # construct the parameter list
+        params = {
+            "lr": lr,
+            "augmentation_size": aug_size,
+            "threshold": t,
+            "epoch": epoch,
+        }
+
+        # evaluate this model
+        print(f"Evaluating {params}", flush=True)
+        matrix = run_unet(
+            model_path,
+            deepcopy(train_set),
+            deepcopy(val_set),
+            None,
+            params,
+            True,
+        )
+
+        # store the precision, recall, and false positive rate
+        precision_arr.append(precision(matrix))
+        recall_arr.append(recall(matrix))
+        false_positive_rate_arr.append(false_positive_rate(matrix))
+        val_acc = accuracy(matrix)
+
+        print(f"Validation Accuracy = {val_acc}")
+
+        # remember the best accuracy
+        if val_acc > best_acc:
+            best_acc = val_acc
+            best_threshold = t
+
+    # plot an ROC curve
+    plt.suptitle(
+        f"ROC Curve for Learning Rate = {lr} and Augmentation Size = {aug_size} (model after Epoch {epoch} used)\n(Max Accuracy of {best_acc} at threshold {best_threshold})"
+    )
+    plt.plot([0, 1], [0, 1], label="Random")
+    plt.plt(false_positive_rate_arr, recall_arr, label="Our Model")
+    plt.legend()
+    plt.savefig(f"{save_path}/roc.png", format="png")
+    plt.clf()
+
+    # plot a precision-recall curve
+    plt.suptitle(
+        f"Precision-Recall Curve for Learning Rate = {lr} and Augmentation Size = {aug_size} (model after Epoch {epoch} used)\n(Max Accuracy of {best_acc} at threshold {best_threshold})"
+    )
+    plt.plot([0, 1], [0, 1], label="Random")
+    plt.plt(recall_arr, precision_arr, label="Our Model")
+    plt.legend()
+    plt.savefig(f"{save_path}/precision-recall.png", format="png")
+    plt.clf()
+
+
+# def do_unet_k_fold(run_name, images, masks, k=6):
+#     # create a KFold model selection object
+#     kfold = KFold(k)
+
+#     # create a list of indices
+
+
+if __name__ == "__main__":
+    # read in the data for unet
+    images, masks = read_data()
+    images = images.astype(np.float32) / 255.0
+
+    train_set_, val_set_, test_set_ = split_dataset(images, masks)
+
+    # hyperparameter search
+    # do_unet_hyperparameter_search("15", train_set_, val_set_, test_set_)
+
+    # do the threshold tuning
+    do_unet_threshold_tuning("15_thresholds", train_set_, val_set_, test_set_)
