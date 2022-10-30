@@ -503,7 +503,7 @@ def run_unet(save_path, train_set, val_set, test_set, parameters):
         train_loader,
         val_loader,
         save_path,
-        max_epoch=3,
+        max_epoch=5,
         current_epoch=current_epoch,
         threshold=0.5,
     )
@@ -522,7 +522,7 @@ if __name__ == "__main__":
     # run_gmm()
 
     # UNet ------------------------------------------
-    run_name = "test"
+    run_name = "5"
     # read the images
     images, masks = read_data()
     images = images.astype(np.float32) / 255.0
@@ -593,14 +593,22 @@ if __name__ == "__main__":
             # plot
             ax[i, j].set_title(f"Augmentation_size = {aug_size}; Learning Rate = {lr}")
             ax[i, j].set_xlabel("# Epochs")
-            ax[i, j].plot(training_loss, label="Training Loss")
-            ax[i, j].plot(validation_loss, label="Validation Loss")
-            ax[i, j].plot(validation_accuracy, label="Validation Accuracy")
-            ax[i, j].plot(validation_f1_score, label="Validation F1 Score")
+            ax[i, j].plot(training_loss, label="Training Loss" if i == j == 0 else None)
+            ax[i, j].plot(
+                validation_loss, label="Validation Loss" if i == j == 0 else None
+            )
+            ax[i, j].plot(
+                validation_accuracy,
+                label="Validation Accuracy" if i == j == 0 else None,
+            )
+            ax[i, j].plot(
+                validation_f1_score,
+                label="Validation F1 Score" if i == j == 0 else None,
+            )
 
     # save the figure
-    fig.legend(loc="best")
-    fig.savefig(f"hyperparameter_tuning_lr_{lr}.png", format="png")
+    fig.legend()
+    fig.savefig(f"./models/unet/{run_name}/hyperparameter_tuning.png", format="png")
 
     print("The best parameters are:")
     print(
