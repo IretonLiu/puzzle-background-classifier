@@ -422,7 +422,10 @@ def test_gmm(test_set, best_feature, best_foreground_h, best_background_h):
 def gmm_cross_validation(images, masks, best_feature, best_foreground_h, best_background_h):
     # performing 6-fold cross validation
     kf = KFold(n_splits=6)
-
+    average_accuracy = 0
+    average_precision = 0
+    average_recall = 0
+    average_f1 = 0
     for train_index, test_index in kf.split(images):
         train_images, test_images = images[train_index], images[test_index]
         train_masks, test_masks = masks[train_index], masks[test_index]
@@ -462,12 +465,23 @@ def gmm_cross_validation(images, masks, best_feature, best_foreground_h, best_ba
         accuracy_score = accuracy(c_matrix)
         precision_score = precision(c_matrix)
         recall_score = recall(c_matrix)
+        f1 = f1_score(c_matrix)
         print("Confusion matrix:")
         print(c_matrix)
         print("Accuracy score:", accuracy_score)
         print("Precision score:", precision_score)
         print("Recall score:", recall_score)
+        print("F1 score:", f1)
         print("=====================")
+        average_accuracy += accuracy_score
+        average_precision += precision_score
+        average_recall += recall_score
+        average_f1 += f1
+
+    print("Average accuracy:", average_accuracy / 6)
+    print("Average precision:", average_precision / 6)
+    print("Average recall:", average_recall / 6)
+    print("Average F1:", average_f1 / 6)
 
 
 def run_gmm():
@@ -494,7 +508,7 @@ def run_gmm():
     best_background_h = 4
     # # test the model
     # test_gmm(test_set, best_feature, best_foreground_h, best_background_h)
-    gmm_cross_validation(images, masks, best_feature,
+    gmm_cross_validation(images[:6], masks[:6], best_feature,
                          best_foreground_h, best_background_h)
 
 
@@ -949,49 +963,51 @@ def do_unet_prediction(model_path, plot_save_name, image, mask, parameters):
 
 
 if __name__ == "__main__":
-    # read in the data for unet
-    # --------------------------- DO NOT TOUCH ---------------------------
-    images, masks = read_data()
-    images = images.astype(np.float32) / 255.0
+    run_gmm()
+    if 0:
+        # read in the data for unet
+        # --------------------------- DO NOT TOUCH ---------------------------
+        images, masks = read_data()
+        images = images.astype(np.float32) / 255.0
 
-    train_set_, val_set_, test_set_ = split_dataset(images, masks)
-    # --------------------------- DO NOT TOUCH ---------------------------
+        train_set_, val_set_, test_set_ = split_dataset(images, masks)
+        # --------------------------- DO NOT TOUCH ---------------------------
 
-    # hyperparameter search
-    # do_unet_hyperparameter_search("15", train_set_, val_set_, test_set_)
+        # hyperparameter search
+        # do_unet_hyperparameter_search("15", train_set_, val_set_, test_set_)
 
-    # do the threshold tuning
-    # do_unet_threshold_tuning("15_thresholds", train_set_, val_set_, test_set_)
+        # do the threshold tuning
+        # do_unet_threshold_tuning("15_thresholds", train_set_, val_set_, test_set_)
 
-    # do k-fold validation
-    # do_unet_k_fold(
-    #     "15", images, masks, 6, {"lr": 1e-4, "threshold": 0.4, "augmentation_size": 5}
-    # )
+        # do k-fold validation
+        # do_unet_k_fold(
+        #     "15", images, masks, 6, {"lr": 1e-4, "threshold": 0.4, "augmentation_size": 5}
+        # )
 
-    # evaluate on the test set
-    # do_unet_test(
-    #     "./models/unet/15/0.0001_5",
-    #     train_set_,
-    #     test_set_,
-    #     {"lr": 1e-4, "threshold": 0.4, "augmentation_size": 5, "epoch": 13},
-    # )
+        # evaluate on the test set
+        # do_unet_test(
+        #     "./models/unet/15/0.0001_5",
+        #     train_set_,
+        #     test_set_,
+        #     {"lr": 1e-4, "threshold": 0.4, "augmentation_size": 5, "epoch": 13},
+        # )
 
-    # do prediction on some images
-    test_set = augmentation_wrapper(test_set_, n=0)
-    image_save_path = "./models/unet/images"
-    os.makedirs(image_save_path, exist_ok=True)
-    images_to_examine = [0, 1, 2, 3, 4]
-    for i in images_to_examine:
-        if i < 0 or i >= len(test_set):
-            print(f"Image {i} does not exist. Skipping...")
-            continue
-        else:
-            print(f"Processing Image {i}")
+        # do prediction on some images
+        test_set = augmentation_wrapper(test_set_, n=0)
+        image_save_path = "./models/unet/images"
+        os.makedirs(image_save_path, exist_ok=True)
+        images_to_examine = [0, 1, 2, 3, 4]
+        for i in images_to_examine:
+            if i < 0 or i >= len(test_set):
+                print(f"Image {i} does not exist. Skipping...")
+                continue
+            else:
+                print(f"Processing Image {i}")
 
-        do_unet_prediction(
-            "./models/unet/15/0.0001_5",
-            f"{image_save_path}/{i}.png",
-            test_set[i][0],
-            test_set[i][1],
-            {"lr": 1e-4, "threshold": 0.4, "augmentation_size": 5, "epoch": 13},
-        )
+            do_unet_prediction(
+                "./models/unet/15/0.0001_5",
+                f"{image_save_path}/{i}.png",
+                test_set[i][0],
+                test_set[i][1],
+                {"lr": 1e-4, "threshold": 0.4, "augmentation_size": 5, "epoch": 13},
+            )
