@@ -1,0 +1,987 @@
+Loaded data for augmentation size 0
+
+Training with {'lr': 0.001, 'augmentation_size': 0}
+Loading VGG16 weights...
+Finished loading
+Starting epoch 0
+model saved to ./models/unet/15/0.001_0/epoch_0.pt
+Epoch 0:
+	training loss = 4.274279180914164
+	validation loss = 0.3766149803996086
+	validation accuracy = 0.9319968781631047
+	validation F1 Score = 0.8877051080099164
+Starting epoch 1
+model saved to ./models/unet/15/0.001_0/epoch_1.pt
+Epoch 1:
+	training loss = 1.8771172249689698
+	validation loss = 0.39312202855944633
+	validation accuracy = 0.9366605868545452
+	validation F1 Score = 0.8926689390001041
+Starting epoch 2
+model saved to ./models/unet/15/0.001_0/epoch_2.pt
+Epoch 2:
+	training loss = 1.3113040691241622
+	validation loss = 0.37158798798918724
+	validation accuracy = 0.9210645536371849
+	validation F1 Score = 0.888675984093965
+Starting epoch 3
+model saved to ./models/unet/15/0.001_0/epoch_3.pt
+Epoch 3:
+	training loss = 1.9386601950973272
+	validation loss = 0.3197081768885255
+	validation accuracy = 0.9445361505447343
+	validation F1 Score = 0.9171094580233795
+Starting epoch 4
+model saved to ./models/unet/15/0.001_0/epoch_4.pt
+Epoch 4:
+	training loss = 1.209962290711701
+	validation loss = 0.21464348258450627
+	validation accuracy = 0.9614248618664267
+	validation F1 Score = 0.9398711147727438
+Starting epoch 5
+model saved to ./models/unet/15/0.001_0/epoch_5.pt
+Epoch 5:
+	training loss = 0.9648914278950542
+	validation loss = 0.2726393914781511
+	validation accuracy = 0.9485105518449857
+	validation F1 Score = 0.9143638533098213
+Starting epoch 6
+model saved to ./models/unet/15/0.001_0/epoch_6.pt
+Epoch 6:
+	training loss = 0.8460591617040336
+	validation loss = 0.36854303372092545
+	validation accuracy = 0.926074049753482
+	validation F1 Score = 0.8954619259912889
+Starting epoch 7
+model saved to ./models/unet/15/0.001_0/epoch_7.pt
+Epoch 7:
+	training loss = 1.2358263013884425
+	validation loss = 0.34530718182213604
+	validation accuracy = 0.9372703064515544
+	validation F1 Score = 0.8928277011950216
+Starting epoch 8
+model saved to ./models/unet/15/0.001_0/epoch_8.pt
+Epoch 8:
+	training loss = 20.452967629069462
+	validation loss = 4.748847544193268
+	validation accuracy = 0.3215931889173883
+	validation F1 Score = 0.486675009547875
+Starting epoch 9
+model saved to ./models/unet/15/0.001_0/epoch_9.pt
+Epoch 9:
+	training loss = 23.27012699842453
+	validation loss = 4.748847544193268
+	validation accuracy = 0.3215931889173883
+	validation F1 Score = 0.486675009547875
+Starting epoch 10
+model saved to ./models/unet/15/0.001_0/epoch_10.pt
+Epoch 10:
+	training loss = 23.27012699842453
+	validation loss = 4.748847544193268
+	validation accuracy = 0.3215931889173883
+	validation F1 Score = 0.486675009547875
+Starting epoch 11
+model saved to ./models/unet/15/0.001_0/epoch_11.pt
+Epoch 11:
+	training loss = 23.27012699842453
+	validation loss = 4.748847544193268
+	validation accuracy = 0.3215931889173883
+	validation F1 Score = 0.486675009547875
+Starting epoch 12
+model saved to ./models/unet/15/0.001_0/epoch_12.pt
+Epoch 12:
+	training loss = 23.27012699842453
+	validation loss = 4.748847544193268
+	validation accuracy = 0.3215931889173883
+	validation F1 Score = 0.486675009547875
+Starting epoch 13
+model saved to ./models/unet/15/0.001_0/epoch_13.pt
+Epoch 13:
+	training loss = 23.27012699842453
+	validation loss = 4.748847544193268
+	validation accuracy = 0.3215931889173883
+	validation F1 Score = 0.486675009547875
+Starting epoch 14
+model saved to ./models/unet/15/0.001_0/epoch_14.pt
+Epoch 14:
+	training loss = 23.27012699842453
+	validation loss = 4.748847544193268
+	validation accuracy = 0.3215931889173883
+	validation F1 Score = 0.486675009547875
+
+Training with {'lr': 0.0005, 'augmentation_size': 0}
+Loading VGG16 weights...
+Finished loading
+Starting epoch 0
+model saved to ./models/unet/15/0.0005_0/epoch_0.pt
+Epoch 0:
+	training loss = 4.243424581363797
+	validation loss = 0.7090445570647717
+	validation accuracy = 0.8951790203853591
+	validation F1 Score = 0.806324683627564
+Starting epoch 1
+model saved to ./models/unet/15/0.0005_0/epoch_1.pt
+Epoch 1:
+	training loss = 1.7394444807432592
+	validation loss = 0.34380648331716657
+	validation accuracy = 0.9371247356143362
+	validation F1 Score = 0.8957584460792976
+Starting epoch 2
+model saved to ./models/unet/15/0.0005_0/epoch_2.pt
+Epoch 2:
+	training loss = 1.034757330082357
+	validation loss = 0.16646559326909482
+	validation accuracy = 0.9683313137836083
+	validation F1 Score = 0.9493718698616431
+Starting epoch 3
+model saved to ./models/unet/15/0.0005_0/epoch_3.pt
+Epoch 3:
+	training loss = 1.119194328552112
+	validation loss = 0.27368760388344526
+	validation accuracy = 0.951683860048832
+	validation F1 Score = 0.9256488908134152
+Starting epoch 4
+model saved to ./models/unet/15/0.0005_0/epoch_4.pt
+Epoch 4:
+	training loss = 1.5763821145519614
+	validation loss = 0.27377543319016695
+	validation accuracy = 0.9513022467793019
+	validation F1 Score = 0.9217127201519905
+Starting epoch 5
+model saved to ./models/unet/15/0.0005_0/epoch_5.pt
+Epoch 5:
+	training loss = 0.7790423058904707
+	validation loss = 0.2729712980799377
+	validation accuracy = 0.9550988793312993
+	validation F1 Score = 0.9251784730550461
+Starting epoch 6
+model saved to ./models/unet/15/0.0005_0/epoch_6.pt
+Epoch 6:
+	training loss = 0.7176531194709241
+	validation loss = 0.23945194738917053
+	validation accuracy = 0.9604634594523997
+	validation F1 Score = 0.9358900587951751
+Starting epoch 7
+model saved to ./models/unet/15/0.0005_0/epoch_7.pt
+Epoch 7:
+	training loss = 0.3470881013199687
+	validation loss = 0.09265298780519515
+	validation accuracy = 0.9835305417593301
+	validation F1 Score = 0.9741923059430819
+Starting epoch 8
+model saved to ./models/unet/15/0.0005_0/epoch_8.pt
+Epoch 8:
+	training loss = 0.30730192083865404
+	validation loss = 0.10669167572632432
+	validation accuracy = 0.9812195480320274
+	validation F1 Score = 0.9701636951398659
+Starting epoch 9
+model saved to ./models/unet/15/0.0005_0/epoch_9.pt
+Epoch 9:
+	training loss = 0.20704105007462204
+	validation loss = 0.04511237994302064
+	validation accuracy = 0.9914285532889033
+	validation F1 Score = 0.9866797841534465
+Starting epoch 10
+model saved to ./models/unet/15/0.0005_0/epoch_10.pt
+Epoch 10:
+	training loss = 0.5424162080744281
+	validation loss = 0.3959908075630665
+	validation accuracy = 0.9367233954556503
+	validation F1 Score = 0.8914325285361925
+Starting epoch 11
+model saved to ./models/unet/15/0.0005_0/epoch_11.pt
+Epoch 11:
+	training loss = 0.8784138232003897
+	validation loss = 0.19185690605081618
+	validation accuracy = 0.9640802825434717
+	validation F1 Score = 0.9417900334530745
+Starting epoch 12
+model saved to ./models/unet/15/0.0005_0/epoch_12.pt
+Epoch 12:
+	training loss = 0.654571118298918
+	validation loss = 0.1965578757226467
+	validation accuracy = 0.963310480374693
+	validation F1 Score = 0.9416610392049901
+Starting epoch 13
+model saved to ./models/unet/15/0.0005_0/epoch_13.pt
+Epoch 13:
+	training loss = 0.46230079361703247
+	validation loss = 0.06386274262331426
+	validation accuracy = 0.9884912875173688
+	validation F1 Score = 0.9820427583025177
+Starting epoch 14
+model saved to ./models/unet/15/0.0005_0/epoch_14.pt
+Epoch 14:
+	training loss = 0.48917673458345234
+	validation loss = 0.18005029670894146
+	validation accuracy = 0.9695568751156405
+	validation F1 Score = 0.9514065255779797
+
+Training with {'lr': 0.0001, 'augmentation_size': 0}
+Loading VGG16 weights...
+Finished loading
+Starting epoch 0
+model saved to ./models/unet/15/0.0001_0/epoch_0.pt
+Epoch 0:
+	training loss = 5.929481454193592
+	validation loss = 0.6785774640738964
+	validation accuracy = 0.8981201408363838
+	validation F1 Score = 0.8161275946723151
+Starting epoch 1
+model saved to ./models/unet/15/0.0001_0/epoch_1.pt
+Epoch 1:
+	training loss = 2.6394964568316936
+	validation loss = 0.4141829628497362
+	validation accuracy = 0.9301337074942224
+	validation F1 Score = 0.895254095317869
+Starting epoch 2
+model saved to ./models/unet/15/0.0001_0/epoch_2.pt
+Epoch 2:
+	training loss = 1.2239699885249138
+	validation loss = 0.11501237284392118
+	validation accuracy = 0.9797368569034135
+	validation F1 Score = 0.9679711067951142
+Starting epoch 3
+model saved to ./models/unet/15/0.0001_0/epoch_3.pt
+Epoch 3:
+	training loss = 0.8467563111335039
+	validation loss = 0.12228397419676185
+	validation accuracy = 0.9808254637406173
+	validation F1 Score = 0.9694948490722992
+Starting epoch 4
+model saved to ./models/unet/15/0.0001_0/epoch_4.pt
+Epoch 4:
+	training loss = 0.5891867822501808
+	validation loss = 0.069255574606359
+	validation accuracy = 0.9879616092062444
+	validation F1 Score = 0.9813344864804052
+Starting epoch 5
+model saved to ./models/unet/15/0.0001_0/epoch_5.pt
+Epoch 5:
+	training loss = 0.6439004463609308
+	validation loss = 0.18900766619481146
+	validation accuracy = 0.9669146056980327
+	validation F1 Score = 0.9460434687429742
+Starting epoch 6
+model saved to ./models/unet/15/0.0001_0/epoch_6.pt
+Epoch 6:
+	training loss = 0.2811662566382438
+	validation loss = 0.04259600699879229
+	validation accuracy = 0.9918004164867816
+	validation F1 Score = 0.9872311215723495
+Starting epoch 7
+model saved to ./models/unet/15/0.0001_0/epoch_7.pt
+Epoch 7:
+	training loss = 0.5645455727353692
+	validation loss = 0.058550991816446185
+	validation accuracy = 0.990281219275937
+	validation F1 Score = 0.9849625273563279
+Starting epoch 8
+model saved to ./models/unet/15/0.0001_0/epoch_8.pt
+Epoch 8:
+	training loss = 0.19678210210986435
+	validation loss = 0.03791010461281985
+	validation accuracy = 0.992724179089316
+	validation F1 Score = 0.9886929998646881
+Starting epoch 9
+model saved to ./models/unet/15/0.0001_0/epoch_9.pt
+Epoch 9:
+	training loss = 0.14296942972578108
+	validation loss = 0.039071818348020315
+	validation accuracy = 0.9926389226488268
+	validation F1 Score = 0.9884809910094675
+Starting epoch 10
+model saved to ./models/unet/15/0.0001_0/epoch_10.pt
+Epoch 10:
+	training loss = 0.17686570715159178
+	validation loss = 0.04078527120873332
+	validation accuracy = 0.9924740784141577
+	validation F1 Score = 0.9883099780611773
+Starting epoch 11
+model saved to ./models/unet/15/0.0001_0/epoch_11.pt
+Epoch 11:
+	training loss = 0.269879664410837
+	validation loss = 0.29021783638745546
+	validation accuracy = 0.950513624704777
+	validation F1 Score = 0.9166527911229109
+Starting epoch 12
+model saved to ./models/unet/15/0.0001_0/epoch_12.pt
+Epoch 12:
+	training loss = 0.5285781108541414
+	validation loss = 0.2075140851084143
+	validation accuracy = 0.9648650499385065
+	validation F1 Score = 0.9423207707091225
+Starting epoch 13
+model saved to ./models/unet/15/0.0001_0/epoch_13.pt
+Epoch 13:
+	training loss = 0.3176431948086247
+	validation loss = 0.04131650156341493
+	validation accuracy = 0.992223297501442
+	validation F1 Score = 0.9878261449837733
+Starting epoch 14
+model saved to ./models/unet/15/0.0001_0/epoch_14.pt
+Epoch 14:
+	training loss = 0.2574198112124577
+	validation loss = 0.04720739834010601
+	validation accuracy = 0.991074829759214
+	validation F1 Score = 0.9860927681122246
+Loaded data for augmentation size 5
+
+Training with {'lr': 0.001, 'augmentation_size': 5}
+Loading VGG16 weights...
+Finished loading
+Starting epoch 0
+model saved to ./models/unet/15/0.001_5/epoch_0.pt
+Epoch 0:
+	training loss = 131.54060607030988
+	validation loss = 4.748847544193268
+	validation accuracy = 0.3215931889173883
+	validation F1 Score = 0.486675009547875
+Starting epoch 1
+model saved to ./models/unet/15/0.001_5/epoch_1.pt
+Epoch 1:
+	training loss = 144.88983291387558
+	validation loss = 4.748847544193268
+	validation accuracy = 0.3215931889173883
+	validation F1 Score = 0.486675009547875
+Starting epoch 2
+model saved to ./models/unet/15/0.001_5/epoch_2.pt
+Epoch 2:
+	training loss = 144.88983291387558
+	validation loss = 4.748847544193268
+	validation accuracy = 0.3215931889173883
+	validation F1 Score = 0.486675009547875
+Starting epoch 3
+model saved to ./models/unet/15/0.001_5/epoch_3.pt
+Epoch 3:
+	training loss = 144.88983291387558
+	validation loss = 4.748847544193268
+	validation accuracy = 0.3215931889173883
+	validation F1 Score = 0.486675009547875
+Starting epoch 4
+model saved to ./models/unet/15/0.001_5/epoch_4.pt
+Epoch 4:
+	training loss = 144.88983291387558
+	validation loss = 4.748847544193268
+	validation accuracy = 0.3215931889173883
+	validation F1 Score = 0.486675009547875
+Starting epoch 5
+model saved to ./models/unet/15/0.001_5/epoch_5.pt
+Epoch 5:
+	training loss = 144.88983291387558
+	validation loss = 4.748847544193268
+	validation accuracy = 0.3215931889173883
+	validation F1 Score = 0.486675009547875
+Starting epoch 6
+model saved to ./models/unet/15/0.001_5/epoch_6.pt
+Epoch 6:
+	training loss = 144.88983291387558
+	validation loss = 4.748847544193268
+	validation accuracy = 0.3215931889173883
+	validation F1 Score = 0.486675009547875
+Starting epoch 7
+model saved to ./models/unet/15/0.001_5/epoch_7.pt
+Epoch 7:
+	training loss = 144.88983291387558
+	validation loss = 4.748847544193268
+	validation accuracy = 0.3215931889173883
+	validation F1 Score = 0.486675009547875
+Starting epoch 8
+model saved to ./models/unet/15/0.001_5/epoch_8.pt
+Epoch 8:
+	training loss = 144.88983291387558
+	validation loss = 4.748847544193268
+	validation accuracy = 0.3215931889173883
+	validation F1 Score = 0.486675009547875
+Starting epoch 9
+model saved to ./models/unet/15/0.001_5/epoch_9.pt
+Epoch 9:
+	training loss = 144.88983291387558
+	validation loss = 4.748847544193268
+	validation accuracy = 0.3215931889173883
+	validation F1 Score = 0.486675009547875
+Starting epoch 10
+model saved to ./models/unet/15/0.001_5/epoch_10.pt
+Epoch 10:
+	training loss = 144.88983291387558
+	validation loss = 4.748847544193268
+	validation accuracy = 0.3215931889173883
+	validation F1 Score = 0.486675009547875
+Starting epoch 11
+model saved to ./models/unet/15/0.001_5/epoch_11.pt
+Epoch 11:
+	training loss = 144.88983291387558
+	validation loss = 4.748847544193268
+	validation accuracy = 0.3215931889173883
+	validation F1 Score = 0.486675009547875
+Starting epoch 12
+model saved to ./models/unet/15/0.001_5/epoch_12.pt
+Epoch 12:
+	training loss = 144.88983291387558
+	validation loss = 4.748847544193268
+	validation accuracy = 0.3215931889173883
+	validation F1 Score = 0.486675009547875
+Starting epoch 13
+model saved to ./models/unet/15/0.001_5/epoch_13.pt
+Epoch 13:
+	training loss = 144.88983291387558
+	validation loss = 4.748847544193268
+	validation accuracy = 0.3215931889173883
+	validation F1 Score = 0.486675009547875
+Starting epoch 14
+model saved to ./models/unet/15/0.001_5/epoch_14.pt
+Epoch 14:
+	training loss = 144.88983291387558
+	validation loss = 4.748847544193268
+	validation accuracy = 0.3215931889173883
+	validation F1 Score = 0.486675009547875
+
+Training with {'lr': 0.0005, 'augmentation_size': 5}
+Loading VGG16 weights...
+Finished loading
+Starting epoch 0
+model saved to ./models/unet/15/0.0005_5/epoch_0.pt
+Epoch 0:
+	training loss = 12.147433918900788
+	validation loss = 0.4083260032348335
+	validation accuracy = 0.9301504866872976
+	validation F1 Score = 0.8793810945335968
+Starting epoch 1
+model saved to ./models/unet/15/0.0005_5/epoch_1.pt
+Epoch 1:
+	training loss = 6.424365970189683
+	validation loss = 0.2712110972497612
+	validation accuracy = 0.955528109229826
+	validation F1 Score = 0.9274569295052723
+Starting epoch 2
+model saved to ./models/unet/15/0.0005_5/epoch_2.pt
+Epoch 2:
+	training loss = 3.853457166464068
+	validation loss = 0.16686212422791868
+	validation accuracy = 0.972173522251931
+	validation F1 Score = 0.9564777324345709
+Starting epoch 3
+model saved to ./models/unet/15/0.0005_5/epoch_3.pt
+Epoch 3:
+	training loss = 3.5575236179865897
+	validation loss = 0.1355940466746688
+	validation accuracy = 0.9788443852285054
+	validation F1 Score = 0.9671500914893594
+Starting epoch 4
+model saved to ./models/unet/15/0.0005_5/epoch_4.pt
+Epoch 4:
+	training loss = 2.6752538080327213
+	validation loss = 0.08528577373363078
+	validation accuracy = 0.984804399957916
+	validation F1 Score = 0.975998063112172
+Starting epoch 5
+model saved to ./models/unet/15/0.0005_5/epoch_5.pt
+Epoch 5:
+	training loss = 2.708711424958892
+	validation loss = 0.18525432609021664
+	validation accuracy = 0.968663042965618
+	validation F1 Score = 0.9489265759708082
+Starting epoch 6
+model saved to ./models/unet/15/0.0005_5/epoch_6.pt
+Epoch 6:
+	training loss = 2.4243816611124203
+	validation loss = 0.12255464773625135
+	validation accuracy = 0.9787344134901085
+	validation F1 Score = 0.9663881989914954
+Starting epoch 7
+model saved to ./models/unet/15/0.0005_5/epoch_7.pt
+Epoch 7:
+	training loss = 2.4503415811341256
+	validation loss = 0.09155059955082834
+	validation accuracy = 0.98520460638734
+	validation F1 Score = 0.9766104741172428
+Starting epoch 8
+model saved to ./models/unet/15/0.0005_5/epoch_8.pt
+Epoch 8:
+	training loss = 1.079310753615573
+	validation loss = 0.1527524043340236
+	validation accuracy = 0.9744276027702901
+	validation F1 Score = 0.958824328330527
+Starting epoch 9
+model saved to ./models/unet/15/0.0005_5/epoch_9.pt
+Epoch 9:
+	training loss = 1.986938831745647
+	validation loss = 0.32799438410438597
+	validation accuracy = 0.9457444791919867
+	validation F1 Score = 0.9103768584950006
+Starting epoch 10
+model saved to ./models/unet/15/0.0005_5/epoch_10.pt
+Epoch 10:
+	training loss = 7.028895518742502
+	validation loss = 0.2432334265904501
+	validation accuracy = 0.9556294646258331
+	validation F1 Score = 0.9333562649211414
+Starting epoch 11
+model saved to ./models/unet/15/0.0005_5/epoch_11.pt
+Epoch 11:
+	training loss = 3.1758859559195116
+	validation loss = 0.11041091033257544
+	validation accuracy = 0.981260362285453
+	validation F1 Score = 0.9701014898246086
+Starting epoch 12
+model saved to ./models/unet/15/0.0005_5/epoch_12.pt
+Epoch 12:
+	training loss = 3.0790974848205224
+	validation loss = 0.1173264350509271
+	validation accuracy = 0.9791788353607438
+	validation F1 Score = 0.9667292038502036
+Starting epoch 13
+model saved to ./models/unet/15/0.0005_5/epoch_13.pt
+Epoch 13:
+	training loss = 0.757466496899724
+	validation loss = 0.038335552089847624
+	validation accuracy = 0.9930574954922925
+	validation F1 Score = 0.9891333897875584
+Starting epoch 14
+model saved to ./models/unet/15/0.0005_5/epoch_14.pt
+Epoch 14:
+	training loss = 0.5977615084848367
+	validation loss = 0.03199474874418229
+	validation accuracy = 0.9940735436567394
+	validation F1 Score = 0.9907350198666952
+
+Training with {'lr': 0.0001, 'augmentation_size': 5}
+Loading VGG16 weights...
+Finished loading
+Starting epoch 0
+model saved to ./models/unet/15/0.0001_5/epoch_0.pt
+Epoch 0:
+	training loss = 11.483844823902473
+	validation loss = 0.051352608716115355
+	validation accuracy = 0.9900481245397059
+	validation F1 Score = 0.9844255000234203
+Starting epoch 1
+model saved to ./models/unet/15/0.0001_5/epoch_1.pt
+Epoch 1:
+	training loss = 2.5733454526634887
+	validation loss = 0.03263568808324635
+	validation accuracy = 0.9934205156019286
+	validation F1 Score = 0.989695715183133
+Starting epoch 2
+model saved to ./models/unet/15/0.0001_5/epoch_2.pt
+Epoch 2:
+	training loss = 0.7386340836528689
+	validation loss = 0.018873069784604013
+	validation accuracy = 0.9963035891147479
+	validation F1 Score = 0.9942444651257377
+Starting epoch 3
+model saved to ./models/unet/15/0.0001_5/epoch_3.pt
+Epoch 3:
+	training loss = 3.378505942877382
+	validation loss = 0.09791671275161207
+	validation accuracy = 0.9813088858978593
+	validation F1 Score = 0.9703819532274013
+Starting epoch 4
+model saved to ./models/unet/15/0.0001_5/epoch_4.pt
+Epoch 4:
+	training loss = 1.1353635357809253
+	validation loss = 0.08257270907051861
+	validation accuracy = 0.9850399888985231
+	validation F1 Score = 0.97627956156539
+Starting epoch 5
+model saved to ./models/unet/15/0.0001_5/epoch_5.pt
+Epoch 5:
+	training loss = 0.7030054052593186
+	validation loss = 0.01797843584790826
+	validation accuracy = 0.9967208014830993
+	validation F1 Score = 0.9948996181943477
+Starting epoch 6
+model saved to ./models/unet/15/0.0001_5/epoch_6.pt
+Epoch 6:
+	training loss = 1.3207065894966945
+	validation loss = 0.02872819174081087
+	validation accuracy = 0.9944789652407677
+	validation F1 Score = 0.9913654834233522
+Starting epoch 7
+model saved to ./models/unet/15/0.0001_5/epoch_7.pt
+Epoch 7:
+	training loss = 0.5572223790222779
+	validation loss = 0.04182110633701086
+	validation accuracy = 0.9920895174485469
+	validation F1 Score = 0.987563981137261
+Starting epoch 8
+model saved to ./models/unet/15/0.0001_5/epoch_8.pt
+Epoch 8:
+	training loss = 0.546299246721901
+	validation loss = 0.019503333140164614
+	validation accuracy = 0.9960952096764246
+	validation F1 Score = 0.9939164252984294
+Starting epoch 9
+model saved to ./models/unet/15/0.0001_5/epoch_9.pt
+Epoch 9:
+	training loss = 0.39646779181202874
+	validation loss = 0.018143397639505565
+	validation accuracy = 0.996474555487431
+	validation F1 Score = 0.9945022732753481
+Starting epoch 10
+model saved to ./models/unet/15/0.0001_5/epoch_10.pt
+Epoch 10:
+	training loss = 0.35125411598710343
+	validation loss = 0.016713329474441707
+	validation accuracy = 0.9967171735494614
+	validation F1 Score = 0.994887311081589
+Starting epoch 11
+model saved to ./models/unet/15/0.0001_5/epoch_11.pt
+Epoch 11:
+	training loss = 0.3399421309004538
+	validation loss = 0.01697874639648944
+	validation accuracy = 0.9966509637605709
+	validation F1 Score = 0.9947772572715289
+Starting epoch 12
+model saved to ./models/unet/15/0.0001_5/epoch_12.pt
+Epoch 12:
+	training loss = 0.3388004220323637
+	validation loss = 0.01556615182198584
+	validation accuracy = 0.9969248727502277
+	validation F1 Score = 0.9952064763819465
+Starting epoch 13
+model saved to ./models/unet/15/0.0001_5/epoch_13.pt
+Epoch 13:
+	training loss = 0.32417942624306306
+	validation loss = 0.014613913896027952
+	validation accuracy = 0.9971325719509939
+	validation F1 Score = 0.9955362248449363
+Starting epoch 14
+model saved to ./models/unet/15/0.0001_5/epoch_14.pt
+Epoch 14:
+	training loss = 0.314743647351861
+	validation loss = 0.017729094019159675
+	validation accuracy = 0.9965815795297472
+	validation F1 Score = 0.9946708104920982
+Loaded data for augmentation size 10
+
+Training with {'lr': 0.001, 'augmentation_size': 10}
+Loading VGG16 weights...
+Finished loading
+Starting epoch 0
+model saved to ./models/unet/15/0.001_10/epoch_0.pt
+Epoch 0:
+	training loss = 21.226496255025268
+	validation loss = 0.4979224940761924
+	validation accuracy = 0.9285716553172809
+	validation F1 Score = 0.884988333260922
+Starting epoch 1
+model saved to ./models/unet/15/0.001_10/epoch_1.pt
+Epoch 1:
+	training loss = 11.022456137114204
+	validation loss = 0.4580750928726047
+	validation accuracy = 0.9250942809254133
+	validation F1 Score = 0.8687425426640077
+Starting epoch 2
+model saved to ./models/unet/15/0.001_10/epoch_2.pt
+Epoch 2:
+	training loss = 11.723409990197979
+	validation loss = 0.4381467280909419
+	validation accuracy = 0.93450083261077
+	validation F1 Score = 0.8882260166477323
+Starting epoch 3
+model saved to ./models/unet/15/0.001_10/epoch_3.pt
+Epoch 3:
+	training loss = 7.7700269360793754
+	validation loss = 0.20521530485711992
+	validation accuracy = 0.9629166228291353
+	validation F1 Score = 0.939890208277896
+Starting epoch 4
+model saved to ./models/unet/15/0.001_10/epoch_4.pt
+Epoch 4:
+	training loss = 7.2008487184066325
+	validation loss = 0.46310817124322057
+	validation accuracy = 0.9218397977064203
+	validation F1 Score = 0.8619806014324702
+Starting epoch 5
+model saved to ./models/unet/15/0.001_10/epoch_5.pt
+Epoch 5:
+	training loss = 9.692333907238208
+	validation loss = 0.30238494381774217
+	validation accuracy = 0.9485527265735255
+	validation F1 Score = 0.9135289432263819
+Starting epoch 6
+model saved to ./models/unet/15/0.001_10/epoch_6.pt
+Epoch 6:
+	training loss = 8.28042283753166
+	validation loss = 0.25516538857482374
+	validation accuracy = 0.9536209498655851
+	validation F1 Score = 0.9236215303475794
+Starting epoch 7
+model saved to ./models/unet/15/0.001_10/epoch_7.pt
+Epoch 7:
+	training loss = 6.696496318094432
+	validation loss = 0.21199130511377007
+	validation accuracy = 0.9616076190234328
+	validation F1 Score = 0.9367657971601208
+Starting epoch 8
+model saved to ./models/unet/15/0.001_10/epoch_8.pt
+Epoch 8:
+	training loss = 5.378377293003723
+	validation loss = 0.15303452068474144
+	validation accuracy = 0.9734854737537141
+	validation F1 Score = 0.9576658835932174
+Starting epoch 9
+model saved to ./models/unet/15/0.001_10/epoch_9.pt
+Epoch 9:
+	training loss = 8.807191097410396
+	validation loss = 0.22805504396092147
+	validation accuracy = 0.9534427276256263
+	validation F1 Score = 0.9223260423838454
+Starting epoch 10
+model saved to ./models/unet/15/0.001_10/epoch_10.pt
+Epoch 10:
+	training loss = 5.051357197924517
+	validation loss = 0.37566466303542256
+	validation accuracy = 0.9390588777350085
+	validation F1 Score = 0.8956549692435991
+Starting epoch 11
+model saved to ./models/unet/15/0.001_10/epoch_11.pt
+Epoch 11:
+	training loss = 4.839917564881034
+	validation loss = 0.2010079298634082
+	validation accuracy = 0.9635789474638929
+	validation F1 Score = 0.9405871341230883
+Starting epoch 12
+model saved to ./models/unet/15/0.001_10/epoch_12.pt
+Epoch 12:
+	training loss = 5.155852185271215
+	validation loss = 0.19854502973612398
+	validation accuracy = 0.9642247196514282
+	validation F1 Score = 0.9414861205836071
+Starting epoch 13
+model saved to ./models/unet/15/0.001_10/epoch_13.pt
+Epoch 13:
+	training loss = 6.680753736640327
+	validation loss = 0.14501458790618926
+	validation accuracy = 0.9726512757628638
+	validation F1 Score = 0.9559518375008673
+Starting epoch 14
+model saved to ./models/unet/15/0.001_10/epoch_14.pt
+Epoch 14:
+	training loss = 5.739678488229401
+	validation loss = 0.14710970025043935
+	validation accuracy = 0.9726814329612283
+	validation F1 Score = 0.9561208022746484
+
+Training with {'lr': 0.0005, 'augmentation_size': 10}
+Loading VGG16 weights...
+Finished loading
+Starting epoch 0
+model saved to ./models/unet/15/0.0005_10/epoch_0.pt
+Epoch 0:
+	training loss = 19.661092944443226
+	validation loss = 0.3473165547475219
+	validation accuracy = 0.9369038851541327
+	validation F1 Score = 0.8920560736787471
+Starting epoch 1
+model saved to ./models/unet/15/0.0005_10/epoch_1.pt
+Epoch 1:
+	training loss = 6.542942660162225
+	validation loss = 0.2086786364670843
+	validation accuracy = 0.9616067120400233
+	validation F1 Score = 0.9370424063860743
+Starting epoch 2
+model saved to ./models/unet/15/0.0005_10/epoch_2.pt
+Epoch 2:
+	training loss = 9.486781178740785
+	validation loss = 0.2340414950158447
+	validation accuracy = 0.9606663969902662
+	validation F1 Score = 0.9353863299271509
+Starting epoch 3
+model saved to ./models/unet/15/0.0005_10/epoch_3.pt
+Epoch 3:
+	training loss = 5.449173066997901
+	validation loss = 0.1354742037365213
+	validation accuracy = 0.97433554395423
+	validation F1 Score = 0.9591457960805432
+Starting epoch 4
+model saved to ./models/unet/15/0.0005_10/epoch_4.pt
+Epoch 4:
+	training loss = 7.058167945710011
+	validation loss = 0.3168164836242795
+	validation accuracy = 0.9479706699705048
+	validation F1 Score = 0.9122034257579624
+Starting epoch 5
+model saved to ./models/unet/15/0.0005_10/epoch_5.pt
+Epoch 5:
+	training loss = 6.337095285649411
+	validation loss = 0.269120083656162
+	validation accuracy = 0.9509043078084016
+	validation F1 Score = 0.917634375797654
+Starting epoch 6
+model saved to ./models/unet/15/0.0005_10/epoch_6.pt
+Epoch 6:
+	training loss = 4.804977515595965
+	validation loss = 0.14747934823390096
+	validation accuracy = 0.9729771095527121
+	validation F1 Score = 0.95872945294544
+Starting epoch 7
+model saved to ./models/unet/15/0.0005_10/epoch_7.pt
+Epoch 7:
+	training loss = 5.497943747788668
+	validation loss = 0.26849834504537284
+	validation accuracy = 0.9492579061743802
+	validation F1 Score = 0.9164741353633784
+Starting epoch 8
+model saved to ./models/unet/15/0.0005_10/epoch_8.pt
+Epoch 8:
+	training loss = 6.272196581005119
+	validation loss = 0.19402101985178888
+	validation accuracy = 0.9657008351503233
+	validation F1 Score = 0.9438740961962231
+Starting epoch 9
+model saved to ./models/unet/15/0.0005_10/epoch_9.pt
+Epoch 9:
+	training loss = 3.461258647032082
+	validation loss = 0.08921145810745656
+	validation accuracy = 0.9848200454217291
+	validation F1 Score = 0.9759433624960516
+Starting epoch 10
+model saved to ./models/unet/15/0.0005_10/epoch_10.pt
+Epoch 10:
+	training loss = 1.757163741858676
+	validation loss = 0.22400672500953078
+	validation accuracy = 0.9642231324304616
+	validation F1 Score = 0.9412512445350297
+Starting epoch 11
+model saved to ./models/unet/15/0.0005_10/epoch_11.pt
+Epoch 11:
+	training loss = 2.5919020423898473
+	validation loss = 0.07523910806048661
+	validation accuracy = 0.9871228762983468
+	validation F1 Score = 0.9796453062630349
+Starting epoch 12
+model saved to ./models/unet/15/0.0005_10/epoch_12.pt
+Epoch 12:
+	training loss = 1.095740913937334
+	validation loss = 0.05027813685592264
+	validation accuracy = 0.9905619306411648
+	validation F1 Score = 0.9851303452557786
+Starting epoch 13
+model saved to ./models/unet/15/0.0005_10/epoch_13.pt
+Epoch 13:
+	training loss = 1.4476994528668001
+	validation loss = 0.02746497478801757
+	validation accuracy = 0.9948519621679079
+	validation F1 Score = 0.9919624119561246
+Starting epoch 14
+model saved to ./models/unet/15/0.0005_10/epoch_14.pt
+Epoch 14:
+	training loss = 0.8114144263090566
+	validation loss = 0.027342190966010094
+	validation accuracy = 0.9947458451090012
+	validation F1 Score = 0.9917808743940825
+
+Training with {'lr': 0.0001, 'augmentation_size': 10}
+Loading VGG16 weights...
+Finished loading
+Starting epoch 0
+model saved to ./models/unet/15/0.0001_10/epoch_0.pt
+Epoch 0:
+	training loss = 13.352160757174715
+	validation loss = 0.9276924766600132
+	validation accuracy = 0.8529287854766561
+	validation F1 Score = 0.7035545555468717
+Starting epoch 1
+model saved to ./models/unet/15/0.0001_10/epoch_1.pt
+Epoch 1:
+	training loss = 5.418471477692947
+	validation loss = 0.04833651822991669
+	validation accuracy = 0.9910090734620283
+	validation F1 Score = 0.9858975799831847
+Starting epoch 2
+model saved to ./models/unet/15/0.0001_10/epoch_2.pt
+Epoch 2:
+	training loss = 2.755501981358975
+	validation loss = 0.062351642991416156
+	validation accuracy = 0.9882486694553383
+	validation F1 Score = 0.9815866347661787
+Starting epoch 3
+model saved to ./models/unet/15/0.0001_10/epoch_3.pt
+Epoch 3:
+	training loss = 1.1668694948893972
+	validation loss = 0.02797727019060403
+	validation accuracy = 0.9948583110517742
+	validation F1 Score = 0.9919552308383291
+Starting epoch 4
+model saved to ./models/unet/15/0.0001_10/epoch_4.pt
+Epoch 4:
+	training loss = 0.8772077846806496
+	validation loss = 0.021596002974547446
+	validation accuracy = 0.9960630117653888
+	validation F1 Score = 0.993861451876406
+Starting epoch 5
+model saved to ./models/unet/15/0.0001_10/epoch_5.pt
+Epoch 5:
+	training loss = 0.6663987573119812
+	validation loss = 0.0205005876487121
+	validation accuracy = 0.9962013267353313
+	validation F1 Score = 0.9940738985173249
+Starting epoch 6
+model saved to ./models/unet/15/0.0001_10/epoch_6.pt
+Epoch 6:
+	training loss = 0.7013328163302504
+	validation loss = 0.021386187756434083
+	validation accuracy = 0.9960217440202584
+	validation F1 Score = 0.9937890177656394
+Starting epoch 7
+model saved to ./models/unet/15/0.0001_10/epoch_7.pt
+Epoch 7:
+	training loss = 0.6014270388986915
+	validation loss = 0.01799438934540376
+	validation accuracy = 0.9966092425237358
+	validation F1 Score = 0.9947137716253192
+Starting epoch 8
+model saved to ./models/unet/15/0.0001_10/epoch_8.pt
+Epoch 8:
+	training loss = 0.5963658564141952
+	validation loss = 0.03157261840533465
+	validation accuracy = 0.9943528945468529
+	validation F1 Score = 0.9911811145187431
+Starting epoch 9
+model saved to ./models/unet/15/0.0001_10/epoch_9.pt
+Epoch 9:
+	training loss = 0.5895868361112662
+	validation loss = 0.018274938222020864
+	validation accuracy = 0.9965507420938255
+	validation F1 Score = 0.9946222494354281
+Starting epoch 10
+model saved to ./models/unet/15/0.0001_10/epoch_10.pt
+Epoch 10:
+	training loss = 0.5617511891759932
+	validation loss = 0.01877594442339614
+	validation accuracy = 0.996423537670649
+	validation F1 Score = 0.9944244271808556
+Starting epoch 11
+model saved to ./models/unet/15/0.0001_10/epoch_11.pt
+Epoch 11:
+	training loss = 1.9934547333978117
+	validation loss = 0.39078382309526205
+	validation accuracy = 0.930542983757741
+	validation F1 Score = 0.8880566497575458
+Starting epoch 12
+model saved to ./models/unet/15/0.0001_10/epoch_12.pt
+Epoch 12:
+	training loss = 10.477546848589554
+	validation loss = 0.14487288845703006
+	validation accuracy = 0.9736228817402472
+	validation F1 Score = 0.9603024045695113
+Starting epoch 13
+model saved to ./models/unet/15/0.0001_10/epoch_13.pt
+Epoch 13:
+	training loss = 3.83836033946136
+	validation loss = 0.04608592879958451
+	validation accuracy = 0.9913666516712076
+	validation F1 Score = 0.9864757488776558
+Starting epoch 14
+model saved to ./models/unet/15/0.0001_10/epoch_14.pt
+Epoch 14:
+	training loss = 0.9685787871712819
+	validation loss = 0.01675700390478596
+	validation accuracy = 0.9968461919394571
+	validation F1 Score = 0.9950887149198336
+The best parameters are:
+Validation Accuracy 0.9971325719509939 with params {'lr': 0.0001, 'augmentation_size': 5} after Epoch 13
+Validation F1 Score 0.9955362248449363 with params {'lr': 0.0001, 'augmentation_size': 5} after Epoch 13

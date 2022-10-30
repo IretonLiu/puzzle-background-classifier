@@ -503,7 +503,7 @@ def run_unet(save_path, train_set, val_set, test_set, parameters):
         train_loader,
         val_loader,
         save_path,
-        max_epoch=5,
+        max_epoch=15,
         current_epoch=current_epoch,
         threshold=0.5,
     )
@@ -522,7 +522,7 @@ if __name__ == "__main__":
     # run_gmm()
 
     # UNet ------------------------------------------
-    run_name = "5"
+    run_name = "15"
     # read the images
     images, masks = read_data()
     images = images.astype(np.float32) / 255.0
