@@ -1,0 +1,36 @@
+Evaluating {'lr': 0.0001, 'augmentation_size': 5, 'threshold': 0.1, 'epoch': 13}
+loading model from ./models/unet/15/0.0001_5/epoch_13.pt
+model loaded from ./models/unet/15/0.0001_5/epoch_13.pt
+Validation Accuracy = 0.9957845678586847
+Evaluating {'lr': 0.0001, 'augmentation_size': 5, 'threshold': 0.2, 'epoch': 13}
+loading model from ./models/unet/15/0.0001_5/epoch_13.pt
+model loaded from ./models/unet/15/0.0001_5/epoch_13.pt
+Validation Accuracy = 0.9967085572070715
+Evaluating {'lr': 0.0001, 'augmentation_size': 5, 'threshold': 0.3, 'epoch': 13}
+loading model from ./models/unet/15/0.0001_5/epoch_13.pt
+model loaded from ./models/unet/15/0.0001_5/epoch_13.pt
+Validation Accuracy = 0.9970552516153375
+Evaluating {'lr': 0.0001, 'augmentation_size': 5, 'threshold': 0.4, 'epoch': 13}
+loading model from ./models/unet/15/0.0001_5/epoch_13.pt
+model loaded from ./models/unet/15/0.0001_5/epoch_13.pt
+Validation Accuracy = 0.9971597814532777
+Evaluating {'lr': 0.0001, 'augmentation_size': 5, 'threshold': 0.5, 'epoch': 13}
+loading model from ./models/unet/15/0.0001_5/epoch_13.pt
+model loaded from ./models/unet/15/0.0001_5/epoch_13.pt
+Validation Accuracy = 0.9971325719509939
+Evaluating {'lr': 0.0001, 'augmentation_size': 5, 'threshold': 0.6, 'epoch': 13}
+loading model from ./models/unet/15/0.0001_5/epoch_13.pt
+model loaded from ./models/unet/15/0.0001_5/epoch_13.pt
+Validation Accuracy = 0.9969618323241631
+Evaluating {'lr': 0.0001, 'augmentation_size': 5, 'threshold': 0.7, 'epoch': 13}
+loading model from ./models/unet/15/0.0001_5/epoch_13.pt
+model loaded from ./models/unet/15/0.0001_5/epoch_13.pt
+Validation Accuracy = 0.996624887987549
+Evaluating {'lr': 0.0001, 'augmentation_size': 5, 'threshold': 0.8, 'epoch': 13}
+loading model from ./models/unet/15/0.0001_5/epoch_13.pt
+model loaded from ./models/unet/15/0.0001_5/epoch_13.pt
+Validation Accuracy = 0.9959754878663759
+Evaluating {'lr': 0.0001, 'augmentation_size': 5, 'threshold': 0.9, 'epoch': 13}
+loading model from ./models/unet/15/0.0001_5/epoch_13.pt
+model loaded from ./models/unet/15/0.0001_5/epoch_13.pt
+Validation Accuracy = 0.9946186406858246
