@@ -483,7 +483,7 @@ def gmm_cross_validation(images, masks, best_feature, best_foreground_h, best_ba
     print("Average F1:", average_f1 / 6)
 
 
-def run_gmm():
+def execute_gmm():
 
     images, masks = read_data()
     train_set, val_set, test_set = split_dataset(images, masks)
@@ -956,52 +956,61 @@ def do_unet_prediction(model_path, plot_save_name, image, mask, parameters):
     fig.savefig(plot_save_name, bbox_inches="tight", format="png")
 
 
+def execute_unet():
+    # read in the data for unet
+    # --------------------------- DO NOT TOUCH ---------------------------
+    images, masks = read_data()
+    images = images.astype(np.float32) / 255.0
+
+    train_set_, val_set_, test_set_ = split_dataset(images, masks)
+    # --------------------------- DO NOT TOUCH ---------------------------
+
+    # todo: uncomment the below sections depending on what you want to run
+
+    # hyperparameter search
+    # do_unet_hyperparameter_search("15", train_set_, val_set_, test_set_)
+
+    # do the threshold tuning
+    # do_unet_threshold_tuning("15_thresholds", train_set_, val_set_, test_set_)
+
+    # do k-fold validation
+    # do_unet_k_fold(
+    #     "15", images, masks, 6, {"lr": 1e-4, "threshold": 0.4, "augmentation_size": 5}
+    # )
+
+    # evaluate on the test set
+    # do_unet_test(
+    #     "./models/unet/15/0.0001_5",
+    #     train_set_,
+    #     test_set_,
+    #     {"lr": 1e-4, "threshold": 0.4, "augmentation_size": 5, "epoch": 13},
+    # )
+
+    # do prediction on some images
+    test_set = augmentation_wrapper(test_set_, n=0)
+    image_save_path = "./models/unet/images"
+    os.makedirs(image_save_path, exist_ok=True)
+    images_to_examine = [0, 1, 2, 3, 4]
+    for i in images_to_examine:
+        if i < 0 or i >= len(test_set):
+            print(f"Image {i} does not exist. Skipping...")
+            continue
+        else:
+            print(f"Processing Image {i}")
+
+    do_unet_prediction(
+        "./models/unet/15/0.0001_5",
+        f"{image_save_path}/{i}.png",
+        test_set[i][0],
+        test_set[i][1],
+        {"lr": 1e-4, "threshold": 0.4, "augmentation_size": 5, "epoch": 13},
+    )
+
+
 if __name__ == "__main__":
-    run_gmm()
-    if 0:
-        # read in the data for unet
-        # --------------------------- DO NOT TOUCH ---------------------------
-        images, masks = read_data()
-        images = images.astype(np.float32) / 255.0
 
-        train_set_, val_set_, test_set_ = split_dataset(images, masks)
-        # --------------------------- DO NOT TOUCH ---------------------------
+    # Uncomment the section you want to run
 
-        # hyperparameter search
-        # do_unet_hyperparameter_search("15", train_set_, val_set_, test_set_)
-
-        # do the threshold tuning
-        # do_unet_threshold_tuning("15_thresholds", train_set_, val_set_, test_set_)
-
-        # do k-fold validation
-        # do_unet_k_fold(
-        #     "15", images, masks, 6, {"lr": 1e-4, "threshold": 0.4, "augmentation_size": 5}
-        # )
-
-        # evaluate on the test set
-        # do_unet_test(
-        #     "./models/unet/15/0.0001_5",
-        #     train_set_,
-        #     test_set_,
-        #     {"lr": 1e-4, "threshold": 0.4, "augmentation_size": 5, "epoch": 13},
-        # )
-
-        # do prediction on some images
-        test_set = augmentation_wrapper(test_set_, n=0)
-        image_save_path = "./models/unet/images"
-        os.makedirs(image_save_path, exist_ok=True)
-        images_to_examine = [0, 1, 2, 3, 4]
-        for i in images_to_examine:
-            if i < 0 or i >= len(test_set):
-                print(f"Image {i} does not exist. Skipping...")
-                continue
-            else:
-                print(f"Processing Image {i}")
-
-            do_unet_prediction(
-                "./models/unet/15/0.0001_5",
-                f"{image_save_path}/{i}.png",
-                test_set[i][0],
-                test_set[i][1],
-                {"lr": 1e-4, "threshold": 0.4, "augmentation_size": 5, "epoch": 13},
-            )
+    # execute_gmm()
+    # execute_unet()
+    print("Uncomment the section you want to run in the main function")
