@@ -8,7 +8,7 @@ from natsort import natsorted
 from tqdm import tqdm
 from copy import deepcopy
 
-# from matplotlib.pyplot import scatter
+from matplotlib.pyplot import scatter
 import matplotlib.pyplot as plt
 import numpy as np
 from gmm import GaussianMixtureModel
@@ -249,37 +249,37 @@ def train_gmm(
         train_data_foreground = train_data[train_data_masks[:, 0]]
         train_data_background = train_data[~train_data_masks[:, 0]]
 
-        if 0:
-            for background_h in background_h_list:
-                print("Training background GMM with h = {}".format(background_h))
-                start_time = time.time()
-                gmm_background = GaussianMixtureModel(
-                    background_h, train_data_background.shape[1], max_iter=500, seed=4
-                )
-                gmm_background.fit(train_data_background)
-                print("Training time:", (time.time() - start_time))
-                gmm_background.save_model(
-                    f"models/gmm/{feature}/background/{background_h}/"
-                )
-                print(flush=True, end="")
+        # train background gmm
+        for background_h in background_h_list:
+            print("Training background GMM with h = {}".format(background_h))
+            start_time = time.time()
+            gmm_background = GaussianMixtureModel(
+                background_h, train_data_background.shape[1], max_iter=500, seed=4
+            )
+            gmm_background.fit(train_data_background)
+            print("Training time:", (time.time() - start_time))
+            gmm_background.save_model(
+                f"models/gmm/{feature}/background/{background_h}/"
+            )
+            print(flush=True, end="")
 
-        if 1:
-            for foreground_h in foreground_h_list:
-                print("Training foreground GMM with h = {}".format(foreground_h))
-                start_time = time.time()
-                gmm_foreground = GaussianMixtureModel(
-                    foreground_h, train_data_foreground.shape[1], max_iter=500, seed=2
-                )
-                try:
-                    gmm_foreground.fit(train_data_foreground)
-                except:
-                    print("Failed to fit foreground GMM with h = {}".format())
-                    continue
-                print("Training time:", (time.time() - start_time))
-                gmm_foreground.save_model(
-                    f"models/gmm/{feature}/foreground/{foreground_h}/"
-                )
-                print(flush=True, end="")
+        # train foreground gmm
+        for foreground_h in foreground_h_list:
+            print("Training foreground GMM with h = {}".format(foreground_h))
+            start_time = time.time()
+            gmm_foreground = GaussianMixtureModel(
+                foreground_h, train_data_foreground.shape[1], max_iter=500, seed=2
+            )
+            try:
+                gmm_foreground.fit(train_data_foreground)
+            except:
+                print("Failed to fit foreground GMM with h = {}".format())
+                continue
+            print("Training time:", (time.time() - start_time))
+            gmm_foreground.save_model(
+                f"models/gmm/{feature}/foreground/{foreground_h}/"
+            )
+            print(flush=True, end="")
         print("=============================================================")
 
 
@@ -292,7 +292,7 @@ def validate_gmm(val_set, features, background_h_list, foreground_h_list):
     val_images = np.array(val_images)
     val_masks = np.array(val_masks)
 
-    # loop throug the features
+    # loop through the features
     for feature in features:
         val_data = to_feature_vector(val_images, feature)
 
@@ -303,6 +303,7 @@ def validate_gmm(val_set, features, background_h_list, foreground_h_list):
 
         classifier = Classifier(val_data, val_data_masks)
 
+        # loop through all foreground and background h values
         for foreground_h in foreground_h_list:
 
             gmm_foreground = GaussianMixtureModel(
@@ -325,7 +326,7 @@ def validate_gmm(val_set, features, background_h_list, foreground_h_list):
                     f"models/gmm/{feature}/background/{background_h}/"
                 )
 
-                #                    test the model
+                # predict the masks
                 likelihoods = [gmm_background, gmm_foreground]
                 probabilities = classifier.maximum_a_posteriori(likelihoods)
                 predictions = np.argmax(probabilities, axis=0) == 1
@@ -359,6 +360,7 @@ def validate_gmm(val_set, features, background_h_list, foreground_h_list):
 
 
 def test_gmm(test_set, best_feature, best_foreground_h, best_background_h):
+    # format the test set
     test_images, test_masks = zip(*test_set)
     test_images = np.array(test_images)
     test_masks = np.array(test_masks)
@@ -389,7 +391,7 @@ def test_gmm(test_set, best_feature, best_foreground_h, best_background_h):
         f"models/gmm/{best_feature}/background/{best_background_h}/"
     )
 
-    # test the model
+    # predict the test set
     likelihoods = [gmm_background, gmm_foreground]
     probabilities = classifier.maximum_a_posteriori(likelihoods)
     predictions = np.argmax(probabilities, axis=0) == 1
@@ -399,14 +401,9 @@ def test_gmm(test_set, best_feature, best_foreground_h, best_background_h):
 
     predictions = predictions.reshape((len(test_masks), -1)).astype(np.float32)
     test_masks = test_masks.reshape((len(test_masks), -1))
+
+    # calculate the accuracy image by image
     for prediction, mask in zip(predictions, test_masks):
-        # plot prediction and mask side by side
-        # plt.figure(figsize=(10, 10))
-        # plt.subplot(1, 2, 1)
-        # plt.imshow(prediction.reshape(768, 1024))
-        # plt.subplot(1, 2, 2)
-        # plt.imshow(mask.reshape(768, 1024))
-        # plt.show()
 
         c_matrix = confusion_matrix(mask, prediction)
         accuracy_score = accuracy(c_matrix)
@@ -427,6 +424,7 @@ def gmm_cross_validation(images, masks, best_feature, best_foreground_h, best_ba
     average_recall = 0
     average_f1 = 0
     for train_index, test_index in kf.split(images):
+        # split the data into train and test
         train_images, test_images = images[train_index], images[test_index]
         train_masks, test_masks = masks[train_index], masks[test_index]
         train_set = list(zip(train_images, train_masks))
@@ -461,6 +459,7 @@ def gmm_cross_validation(images, masks, best_feature, best_foreground_h, best_ba
             predictions.reshape(test_masks.shape).astype(np.float32)
         )
 
+        # calculate metrics
         c_matrix = confusion_matrix(test_data_masks, predictions)
         accuracy_score = accuracy(c_matrix)
         precision_score = precision(c_matrix)
@@ -492,22 +491,17 @@ def run_gmm():
     # hyperparameters
     # list of feature sets to use
     features = ["rgb", "rgb+dog", "hsv", "hsv+xy", "all"]
-    # # features = ["all"]
-    # foreground_h_list = [2, 3, 4, 5, 6, 7, 8]
-    # background_h_list = [2, 3, 4, 5, 6]
-    # train_gmm(train_set, features, background_h_list, foreground_h_list)
 
     foreground_h_list = [2, 3, 4, 5, 6, 7, 8]
     background_h_list = [2, 3, 4]
-    # find optimal hyperparameters
+    train_gmm(train_set, features, background_h_list, foreground_h_list)
 
-    # best_feature, best_foreground_h, best_background_h = validate_gmm(
-    #     val_set, features, background_h_list, foreground_h_list)
-    best_feature = "rgb+dog"
-    best_foreground_h = 5
-    best_background_h = 4
-    # # test the model
-    # test_gmm(test_set, best_feature, best_foreground_h, best_background_h)
+    # find optimal hyperparameters
+    best_feature, best_foreground_h, best_background_h = validate_gmm(
+        val_set, features, background_h_list, foreground_h_list)
+
+    # test the model
+    test_gmm(test_set, best_feature, best_foreground_h, best_background_h)
     gmm_cross_validation(images[:6], masks[:6], best_feature,
                          best_foreground_h, best_background_h)
 
