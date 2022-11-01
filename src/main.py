@@ -948,7 +948,7 @@ def do_unet_prediction(model_path, plot_save_name, image, mask, parameters):
     fig.savefig(plot_save_name, bbox_inches="tight", format="png")
 
 
-if __name__ == "__main__":
+def unet_experiments():
     # read in the data for unet
     # --------------------------- DO NOT TOUCH ---------------------------
     images, masks = read_data()
@@ -956,6 +956,8 @@ if __name__ == "__main__":
 
     train_set_, val_set_, test_set_ = split_dataset(images, masks)
     # --------------------------- DO NOT TOUCH ---------------------------
+
+    # todo: uncomment the below sections depending on what you want to run
 
     # hyperparameter search
     # do_unet_hyperparameter_search("15", train_set_, val_set_, test_set_)
@@ -995,3 +997,7 @@ if __name__ == "__main__":
             test_set[i][1],
             {"lr": 1e-4, "threshold": 0.4, "augmentation_size": 5, "epoch": 13},
         )
+
+if __name__ == "__main__":
+
+    unet_experiments()
